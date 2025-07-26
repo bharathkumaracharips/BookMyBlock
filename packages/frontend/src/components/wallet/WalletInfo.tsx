@@ -41,7 +41,7 @@ export function WalletInfo() {
 
   const displayName = user.email || user.phone || user.google || user.apple || 'User'
   const initials = displayName.split('@')[0].slice(0, 2).toUpperCase()
-  
+
   return (
     <div className="bg-white/60 backdrop-blur-xl border border-white/20 rounded-3xl p-8 shadow-2xl">
       <div className="text-center mb-8">
@@ -51,7 +51,7 @@ export function WalletInfo() {
         <h3 className="text-2xl font-bold text-gray-900 mb-2">Welcome Back!</h3>
         <p className="text-gray-600">Your digital wallet is ready</p>
       </div>
-      
+
       <div className="space-y-6">
         <div className="bg-white/50 rounded-2xl p-4 border border-white/30">
           <div className="flex items-center justify-between mb-2">
@@ -65,12 +65,12 @@ export function WalletInfo() {
             {user.loginMethod} • {displayName.split('@')[0]}
           </p>
         </div>
-        
+
         {embeddedWallet && (
           <div className="bg-white/50 rounded-2xl p-4 border border-white/30">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm font-medium text-gray-500">Wallet Address</span>
-              <button 
+              <button
                 onClick={() => navigator.clipboard.writeText(embeddedWallet.address)}
                 className="text-blue-600 hover:text-blue-700 text-xs font-medium"
               >
@@ -82,7 +82,7 @@ export function WalletInfo() {
             </p>
           </div>
         )}
-        
+
         <div className="space-y-3">
           <div className="flex items-center justify-center">
             <span className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-green-100 to-emerald-100 border border-green-200 rounded-full text-sm font-medium text-green-800">
@@ -92,7 +92,7 @@ export function WalletInfo() {
               Wallet Auto-Created
             </span>
           </div>
-          
+
           <button
             onClick={testApiCall}
             disabled={loading}
@@ -107,7 +107,7 @@ export function WalletInfo() {
               'Test API Connection'
             )}
           </button>
-          
+
           {profileData && (
             <div className="mt-4 p-4 bg-gray-900/5 backdrop-blur-sm rounded-2xl border border-gray-200/50">
               <h4 className="text-sm font-medium text-gray-700 mb-2">API Response:</h4>
