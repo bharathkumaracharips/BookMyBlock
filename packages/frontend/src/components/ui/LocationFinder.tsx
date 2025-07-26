@@ -1,56 +1,136 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+
+interface City {
+  name: string
+  state: string
+  latitude: number
+  longitude: number
+}
 
 interface LocationData {
   latitude: number
   longitude: number
-  city?: string
-  country?: string
+  city: string
+  state?: string
+  isCurrentLocation?: boolean
 }
 
+// Popular Indian cities with coordinates
+const INDIAN_CITIES: City[] = [
+  { name: 'Mumbai', state: 'Maharashtra', latitude: 19.0760, longitude: 72.8777 },
+  { name: 'Delhi', state: 'Delhi', latitude: 28.7041, longitude: 77.1025 },
+  { name: 'Bangalore', state: 'Karnataka', latitude: 12.9716, longitude: 77.5946 },
+  { name: 'Hyderabad', state: 'Telangana', latitude: 17.3850, longitude: 78.4867 },
+  { name: 'Chennai', state: 'Tamil Nadu', latitude: 13.0827, longitude: 80.2707 },
+  { name: 'Kolkata', state: 'West Bengal', latitude: 22.5726, longitude: 88.3639 },
+  { name: 'Pune', state: 'Maharashtra', latitude: 18.5204, longitude: 73.8567 },
+  { name: 'Ahmedabad', state: 'Gujarat', latitude: 23.0225, longitude: 72.5714 },
+  { name: 'Jaipur', state: 'Rajasthan', latitude: 26.9124, longitude: 75.7873 },
+  { name: 'Surat', state: 'Gujarat', latitude: 21.1702, longitude: 72.8311 },
+  { name: 'Lucknow', state: 'Uttar Pradesh', latitude: 26.8467, longitude: 80.9462 },
+  { name: 'Kanpur', state: 'Uttar Pradesh', latitude: 26.4499, longitude: 80.3319 },
+  { name: 'Nagpur', state: 'Maharashtra', latitude: 21.1458, longitude: 79.0882 },
+  { name: 'Indore', state: 'Madhya Pradesh', latitude: 22.7196, longitude: 75.8577 },
+  { name: 'Thane', state: 'Maharashtra', latitude: 19.2183, longitude: 72.9781 },
+  { name: 'Bhopal', state: 'Madhya Pradesh', latitude: 23.2599, longitude: 77.4126 },
+  { name: 'Visakhapatnam', state: 'Andhra Pradesh', latitude: 17.6868, longitude: 83.2185 },
+  { name: 'Pimpri-Chinchwad', state: 'Maharashtra', latitude: 18.6298, longitude: 73.7997 },
+  { name: 'Patna', state: 'Bihar', latitude: 25.5941, longitude: 85.1376 },
+  { name: 'Vadodara', state: 'Gujarat', latitude: 22.3072, longitude: 73.1812 },
+  { name: 'Ghaziabad', state: 'Uttar Pradesh', latitude: 28.6692, longitude: 77.4538 },
+  { name: 'Ludhiana', state: 'Punjab', latitude: 30.9010, longitude: 75.8573 },
+  { name: 'Agra', state: 'Uttar Pradesh', latitude: 27.1767, longitude: 78.0081 },
+  { name: 'Nashik', state: 'Maharashtra', latitude: 19.9975, longitude: 73.7898 },
+  { name: 'Faridabad', state: 'Haryana', latitude: 28.4089, longitude: 77.3178 },
+  { name: 'Meerut', state: 'Uttar Pradesh', latitude: 28.9845, longitude: 77.7064 },
+  { name: 'Rajkot', state: 'Gujarat', latitude: 22.3039, longitude: 70.8022 },
+  { name: 'Kalyan-Dombivli', state: 'Maharashtra', latitude: 19.2403, longitude: 73.1305 },
+  { name: 'Vasai-Virar', state: 'Maharashtra', latitude: 19.4912, longitude: 72.8054 },
+  { name: 'Varanasi', state: 'Uttar Pradesh', latitude: 25.3176, longitude: 82.9739 },
+  { name: 'Srinagar', state: 'Jammu and Kashmir', latitude: 34.0837, longitude: 74.7973 },
+  { name: 'Aurangabad', state: 'Maharashtra', latitude: 19.8762, longitude: 75.3433 },
+  { name: 'Dhanbad', state: 'Jharkhand', latitude: 23.7957, longitude: 86.4304 },
+  { name: 'Amritsar', state: 'Punjab', latitude: 31.6340, longitude: 74.8723 },
+  { name: 'Navi Mumbai', state: 'Maharashtra', latitude: 19.0330, longitude: 73.0297 },
+  { name: 'Allahabad', state: 'Uttar Pradesh', latitude: 25.4358, longitude: 81.8463 },
+  { name: 'Ranchi', state: 'Jharkhand', latitude: 23.3441, longitude: 85.3096 },
+  { name: 'Howrah', state: 'West Bengal', latitude: 22.5958, longitude: 88.2636 },
+  { name: 'Coimbatore', state: 'Tamil Nadu', latitude: 11.0168, longitude: 76.9558 },
+  { name: 'Jabalpur', state: 'Madhya Pradesh', latitude: 23.1815, longitude: 79.9864 },
+  { name: 'Gwalior', state: 'Madhya Pradesh', latitude: 26.2183, longitude: 78.1828 },
+  { name: 'Vijayawada', state: 'Andhra Pradesh', latitude: 16.5062, longitude: 80.6480 },
+  { name: 'Jodhpur', state: 'Rajasthan', latitude: 26.2389, longitude: 73.0243 },
+  { name: 'Madurai', state: 'Tamil Nadu', latitude: 9.9252, longitude: 78.1198 },
+  { name: 'Raipur', state: 'Chhattisgarh', latitude: 21.2514, longitude: 81.6296 },
+  { name: 'Kota', state: 'Rajasthan', latitude: 25.2138, longitude: 75.8648 },
+  { name: 'Chandigarh', state: 'Chandigarh', latitude: 30.7333, longitude: 76.7794 },
+  { name: 'Guwahati', state: 'Assam', latitude: 26.1445, longitude: 91.7362 },
+  { name: 'Solapur', state: 'Maharashtra', latitude: 17.6599, longitude: 75.9064 },
+  { name: 'Hubli-Dharwad', state: 'Karnataka', latitude: 15.3647, longitude: 75.1240 },
+  { name: 'Bareilly', state: 'Uttar Pradesh', latitude: 28.3670, longitude: 79.4304 }
+]
+
 export function LocationFinder() {
-  const [location, setLocation] = useState<LocationData | null>(null)
+  const [selectedLocation, setSelectedLocation] = useState<LocationData | null>(null)
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const dropdownRef = useRef<HTMLDivElement>(null)
 
-  // Reverse geocoding to get city name
-  const getCityFromCoords = async (lat: number, lon: number): Promise<{ city?: string; country?: string }> => {
-    try {
-      const response = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=en`)
-      const data = await response.json()
-      return {
-        city: data.city || data.locality || 'Unknown City',
-        country: data.countryName || 'Unknown Country'
+  // Filter cities based on search query
+  const filteredCities = INDIAN_CITIES.filter(city =>
+    city.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    city.state.toLowerCase().includes(searchQuery.toLowerCase())
+  )
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsDropdownOpen(false)
       }
-    } catch (error) {
-      console.error('Geocoding error:', error)
-      return {}
     }
-  }
 
-  const requestLocation = () => {
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  // Get current location using HTML5 Geolocation
+  const getCurrentLocation = () => {
     if (!navigator.geolocation) {
-      setError('Geolocation not supported')
       return
     }
 
     setLoading(true)
-    setError(null)
-
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         const { latitude, longitude } = position.coords
-        const locationInfo = await getCityFromCoords(latitude, longitude)
-        
-        setLocation({
-          latitude,
-          longitude,
-          ...locationInfo
-        })
+
+        try {
+          const response = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`)
+          const data = await response.json()
+
+          setSelectedLocation({
+            latitude,
+            longitude,
+            city: data.city || data.locality || 'Current Location',
+            state: data.principalSubdivision || 'India',
+            isCurrentLocation: true
+          })
+        } catch (error) {
+          setSelectedLocation({
+            latitude,
+            longitude,
+            city: 'Current Location',
+            isCurrentLocation: true
+          })
+        }
+
         setLoading(false)
+        setIsDropdownOpen(false)
       },
-      (error) => {
+      () => {
         setLoading(false)
-        setError('Location access denied')
       },
       {
         enableHighAccuracy: true,
@@ -60,51 +140,161 @@ export function LocationFinder() {
     )
   }
 
-  const clearLocation = () => {
-    setLocation(null)
-    setError(null)
+  // Select a city from the list
+  const selectCity = (city: City) => {
+    setSelectedLocation({
+      latitude: city.latitude,
+      longitude: city.longitude,
+      city: city.name,
+      state: city.state,
+      isCurrentLocation: false
+    })
+    setIsDropdownOpen(false)
+    setSearchQuery('')
   }
 
-  if (!location) {
-    return (
-      <button
-        onClick={requestLocation}
-        disabled={loading}
-        className="flex items-center space-x-2 text-slate-300 hover:text-white transition-colors duration-200 group"
-      >
-        {loading ? (
-          <div className="w-4 h-4 border-2 border-slate-600 border-t-violet-500 rounded-full animate-spin"></div>
-        ) : (
+  // Clear selection
+  const clearSelection = () => {
+    setSelectedLocation(null)
+    setSearchQuery('')
+  }
+
+  return (
+    <div className="relative" ref={dropdownRef}>
+      {!selectedLocation ? (
+        <button
+          onClick={() => setIsDropdownOpen(true)}
+          className="flex items-center space-x-2 text-slate-300 hover:text-white transition-colors duration-200 group"
+        >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
           </svg>
-        )}
-        <span className="text-sm font-medium whitespace-nowrap">
-          {loading ? 'Finding...' : 'Near me'}
-        </span>
-      </button>
-    )
-  }
+          <span className="text-sm font-medium whitespace-nowrap">Select City</span>
+          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+      ) : (
+        <div className="flex items-center space-x-2 text-slate-300">
+          <div className={`w-2 h-2 rounded-full ${selectedLocation.isCurrentLocation ? 'bg-green-400 animate-pulse' : 'bg-violet-400'}`}></div>
+          <svg className={`w-4 h-4 ${selectedLocation.isCurrentLocation ? 'text-green-400' : 'text-violet-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+          <div className="flex flex-col">
+            <span className="text-sm font-medium text-white whitespace-nowrap">
+              {selectedLocation.city}
+            </span>
+            {selectedLocation.state && (
+              <span className="text-xs text-slate-400">
+                {selectedLocation.state}
+              </span>
+            )}
+          </div>
+          <button
+            onClick={() => setIsDropdownOpen(true)}
+            className="ml-1 p-1 hover:bg-slate-700 rounded-full transition-colors duration-200"
+          >
+            <svg className="w-3 h-3 text-slate-400 hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+        </div>
+      )}
 
-  return (
-    <div className="flex items-center space-x-2 text-slate-300">
-      <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-      <svg className="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-      </svg>
-      <span className="text-sm font-medium text-white whitespace-nowrap">
-        {location.city || 'Current Location'}
-      </span>
-      <button
-        onClick={clearLocation}
-        className="ml-1 p-1 hover:bg-slate-700 rounded-full transition-colors duration-200"
-      >
-        <svg className="w-3 h-3 text-slate-400 hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-        </svg>
-      </button>
+      {/* Dropdown */}
+      {isDropdownOpen && (
+        <div className="absolute top-full left-0 mt-2 w-80 bg-slate-800 border border-slate-600 rounded-xl shadow-2xl backdrop-blur-xl z-50">
+          {/* Search Input */}
+          <div className="p-4 border-b border-slate-600">
+            <div className="relative">
+              <svg className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              <input
+                type="text"
+                placeholder="Search cities..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-violet-500 transition-colors duration-200"
+                autoFocus
+              />
+            </div>
+          </div>
+
+          {/* Current Location Option */}
+          <div className="p-2 border-b border-slate-600">
+            <button
+              onClick={getCurrentLocation}
+              disabled={loading}
+              className="w-full flex items-center space-x-3 px-3 py-2 text-left hover:bg-slate-700 rounded-lg transition-colors duration-200 group"
+            >
+              {loading ? (
+                <div className="w-4 h-4 border-2 border-slate-600 border-t-violet-500 rounded-full animate-spin"></div>
+              ) : (
+                <svg className="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                </svg>
+              )}
+              <div>
+                <div className="text-sm font-medium text-white">
+                  {loading ? 'Finding your location...' : 'Use current location'}
+                </div>
+                <div className="text-xs text-slate-400">
+                  Automatically detect your city
+                </div>
+              </div>
+            </button>
+          </div>
+
+          {/* Cities List */}
+          <div className="max-h-64 overflow-y-auto">
+            {filteredCities.length > 0 ? (
+              <div className="p-2">
+                {filteredCities.map((city) => (
+                  <button
+                    key={`${city.name}-${city.state}`}
+                    onClick={() => selectCity(city)}
+                    className="w-full flex items-center justify-between px-3 py-2 text-left hover:bg-slate-700 rounded-lg transition-colors duration-200 group"
+                  >
+                    <div className="flex items-center space-x-3">
+                      <svg className="w-4 h-4 text-slate-400 group-hover:text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                      <div>
+                        <div className="text-sm font-medium text-white">{city.name}</div>
+                        <div className="text-xs text-slate-400">{city.state}</div>
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="p-4 text-center text-slate-400">
+                <div className="text-sm">No cities found</div>
+                <div className="text-xs">Try a different search term</div>
+              </div>
+            )}
+          </div>
+
+          {/* Clear Selection */}
+          {selectedLocation && (
+            <div className="p-2 border-t border-slate-600">
+              <button
+                onClick={clearSelection}
+                className="w-full flex items-center justify-center space-x-2 px-3 py-2 text-slate-400 hover:text-red-400 hover:bg-slate-700 rounded-lg transition-colors duration-200"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+                <span className="text-sm">Clear selection</span>
+              </button>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
