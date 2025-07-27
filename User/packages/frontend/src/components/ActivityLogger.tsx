@@ -10,8 +10,11 @@ export const ActivityLogger: React.FC = () => {
     error,
     userLogs,
     isInitialized,
+    recentEvents,
+    userEvents,
     userExistsInBlockchain,
     testConnection,
+    fetchRecentEvents,
     clearError
   } = useActivityLogger()
 
@@ -138,6 +141,68 @@ export const ActivityLogger: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* User Events History */}
+      {userEvents.length > 0 && (
+        <div className="mb-6 p-4 bg-purple-50 rounded">
+          <h3 className="text-lg font-semibold mb-2">📜 Your Activity History</h3>
+          <div className="max-h-40 overflow-y-auto space-y-2">
+            {userEvents.map((event, index) => (
+              <div key={index} className="text-xs p-2 bg-white rounded border">
+                <div className="flex justify-between items-center">
+                  <span className={`font-semibold ${
+                    event.type === 'UserSignedUp' ? 'text-green-600' :
+                    event.type === 'UserLoggedIn' ? 'text-blue-600' :
+                    'text-orange-600'
+                  }`}>
+                    {event.type === 'UserSignedUp' ? '📝 Signed Up' :
+                     event.type === 'UserLoggedIn' ? '🔑 Logged In' :
+                     '🚪 Logged Out'}
+                  </span>
+                  <span className="text-gray-500">{event.date}</span>
+                </div>
+                <div className="text-gray-600 mt-1">
+                  Block: {event.blockNumber} | TX: {event.transactionHash.slice(0, 10)}...
+                  {event.loginCount && <span> | Login #{event.loginCount}</span>}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Recent Network Events */}
+      {recentEvents.length > 0 && (
+        <div className="mb-6 p-4 bg-gray-50 rounded">
+          <div className="flex justify-between items-center mb-2">
+            <h3 className="text-lg font-semibold">🌐 Recent Network Activity</h3>
+            <button
+              onClick={fetchRecentEvents}
+              className="text-xs px-2 py-1 bg-gray-200 hover:bg-gray-300 rounded"
+            >
+              Refresh
+            </button>
+          </div>
+          <div className="max-h-32 overflow-y-auto space-y-1">
+            {recentEvents.slice(0, 10).map((event, index) => (
+              <div key={index} className="text-xs p-2 bg-white rounded border">
+                <div className="flex justify-between items-center">
+                  <span className={`font-semibold ${
+                    event.type === 'UserSignedUp' ? 'text-green-600' :
+                    event.type === 'UserLoggedIn' ? 'text-blue-600' :
+                    'text-orange-600'
+                  }`}>
+                    {event.type === 'UserSignedUp' ? '📝' :
+                     event.type === 'UserLoggedIn' ? '🔑' : '🚪'}
+                    {' '}User: {event.uid ? String(event.uid).slice(0, 15) + '...' : 'Unknown'}
+                  </span>
+                  <span className="text-gray-500">{event.date}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Action Buttons */}
       <div className="space-y-4">
