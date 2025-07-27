@@ -45,9 +45,9 @@ export const polygon = {
   },
 }
 
-// Privy configuration for embedded wallets
+// Privy configuration for User dashboard - isolated authentication
 export const privyConfig = {
-  appId: import.meta.env.VITE_PRIVY_APP_ID,
+  appId: import.meta.env.VITE_PRIVY_APP_ID || 'cmdixityf004cl10kymjigdke',
   config: {
     loginMethods: ['email', 'sms', 'google', 'apple', 'wallet'],
     appearance: {
