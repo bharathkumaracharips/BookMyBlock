@@ -6,6 +6,8 @@ This folder contains utility scripts for development, deployment, and maintenanc
 
 ### 🚀 Deployment Scripts
 - **[deploy-all-contracts.sh](deploy-all-contracts.sh)** - Deploy all UserAuth contracts to Ganache
+- **[clean-deploy.sh](clean-deploy.sh)** - Clean deployment (removes duplicates)
+- **[cleanup-ganache.sh](cleanup-ganache.sh)** - Interactive cleanup utility
 - **[verify-truffle-setup.sh](verify-truffle-setup.sh)** - Verify Truffle configuration and files
 
 ### 🛠️ Development Scripts  

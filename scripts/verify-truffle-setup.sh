@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Change to project root directory
+cd "$(dirname "$0")/.."
+
 echo "🔍 Verifying Truffle Setup for BookMyBlock"
 echo "=========================================="
 
@@ -21,22 +24,20 @@ check_dashboard() {
     echo "--------------------------------"
     
     # Check contracts
-    check_file "../$dashboard/packages/contracts/contracts/UserAuth.sol"
-    check_file "../$dashboard/packages/contracts/contracts/Migrations.sol"
+    check_file "$dashboard/packages/contracts/contracts/UserAuth.sol"
     
     # Check migrations
-    check_file "../$dashboard/packages/contracts/migrations/1_initial_migration.js"
-    check_file "../$dashboard/packages/contracts/migrations/2_deploy_user_auth.js"
+    check_file "$dashboard/packages/contracts/migrations/1_deploy_user_auth.js"
     
     # Check tests
-    check_file "../$dashboard/packages/contracts/test/UserAuth.test.js"
+    check_file "$dashboard/packages/contracts/test/UserAuth.test.js"
     
     # Check configuration
-    check_file "../$dashboard/packages/contracts/truffle-config.js"
-    check_file "../$dashboard/packages/contracts/package.json"
+    check_file "$dashboard/packages/contracts/truffle-config.js"
+    check_file "$dashboard/packages/contracts/package.json"
     
     # Check if Truffle is installed
-    if [ -d "../$dashboard/packages/contracts/node_modules/truffle" ]; then
+    if [ -d "$dashboard/packages/contracts/node_modules/truffle" ]; then
         echo "✅ Truffle installed"
     else
         echo "❌ Truffle not installed"
@@ -63,12 +64,12 @@ missing_count=0
 
 # Check critical files
 critical_files=(
-    "../User/packages/contracts/contracts/UserAuth.sol"
-    "../Admin/packages/contracts/contracts/UserAuth.sol"
-    "../Owner/packages/contracts/contracts/UserAuth.sol"
-    "../User/packages/contracts/migrations/2_deploy_user_auth.js"
-    "../Admin/packages/contracts/migrations/2_deploy_user_auth.js"
-    "../Owner/packages/contracts/migrations/2_deploy_user_auth.js"
+    "User/packages/contracts/contracts/UserAuth.sol"
+    "Admin/packages/contracts/contracts/UserAuth.sol"
+    "Owner/packages/contracts/contracts/UserAuth.sol"
+    "User/packages/contracts/migrations/1_deploy_user_auth.js"
+    "Admin/packages/contracts/migrations/1_deploy_user_auth.js"
+    "Owner/packages/contracts/migrations/1_deploy_user_auth.js"
 )
 
 for file in "${critical_files[@]}"; do

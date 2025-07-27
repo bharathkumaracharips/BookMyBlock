@@ -3,7 +3,9 @@
   "compilerOptions": {
     "composite": true,
     "target": "ES2022",
-    "lib": ["ES2022"],
+    "lib": [
+      "ES2022"
+    ],
     "module": "CommonJS",
     "moduleResolution": "node",
     "resolveJsonModule": true,
@@ -19,8 +21,18 @@
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
-    "types": ["node", "mocha"]
+    "types": [
+      "node",
+      "mocha"
+    ]
   },
-  "include": ["**/*.ts"],
-  "exclude": ["node_modules", "dist", "cache", "artifacts"]
+  "include": [
+    "**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "cache",
+    "artifacts"
+  ]
 }

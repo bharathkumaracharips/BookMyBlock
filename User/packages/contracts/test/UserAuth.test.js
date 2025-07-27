@@ -1,6 +1,6 @@
 const UserAuth = artifacts.require("UserAuth");
 
-contract("UserAuth", (accounts) => {
+contract("UserAuth - User Dashboard", (accounts) => {
   let userAuthInstance;
   const testUid = "did:privy:test123";
   const testWallet = accounts[1];
