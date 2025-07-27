@@ -4,35 +4,41 @@
   "description": "BookMyBlock smart contracts",
   "private": true,
   "scripts": {
-    "build": "hardhat compile",
-    "compile": "hardhat compile",
-    "test": "hardhat test",
-    "deploy:testnet": "hardhat run scripts/deploy.ts --network polygon-mumbai",
-    "deploy:mainnet": "hardhat run scripts/deploy.ts --network polygon",
-    "verify": "hardhat verify --network polygon-mumbai",
-    "node": "hardhat node",
-    "clean": "hardhat clean && rm -rf node_modules"
+    "compile": "truffle compile",
+    "test": "truffle test",
+    "migrate": "truffle migrate",
+    "migrate:reset": "truffle migrate --reset",
+    "migrate:development": "truffle migrate --network development",
+    "migrate:ganache": "truffle migrate --network ganache",
+    "migrate:mumbai": "truffle migrate --network mumbai",
+    "console": "truffle console",
+    "console:development": "truffle console --network development",
+    "ganache": "ganache-cli -p 8545 -m \"abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about\"",
+    "clean": "rm -rf build && rm -rf node_modules"
   },
   "dependencies": {
     "@openzeppelin/contracts": "^5.0.1",
     "@openzeppelin/contracts-upgradeable": "^5.0.1"
   },
   "devDependencies": {
-    "@nomicfoundation/hardhat-toolbox": "^4.0.0",
-    "@nomicfoundation/hardhat-network-helpers": "^1.0.10",
     "@nomicfoundation/hardhat-chai-matchers": "^2.0.2",
     "@nomicfoundation/hardhat-ethers": "^3.0.5",
+    "@nomicfoundation/hardhat-network-helpers": "^1.0.10",
+    "@nomicfoundation/hardhat-toolbox": "^4.0.0",
     "@nomicfoundation/hardhat-verify": "^2.0.2",
-    "@typechain/hardhat": "^9.1.0",
+    "@truffle/hdwallet-provider": "^2.1.15",
     "@typechain/ethers-v6": "^0.5.1",
+    "@typechain/hardhat": "^9.1.0",
+    "@types/mocha": "^10.0.6",
+    "@types/node": "^20.10.5",
+    "chai": "^4.3.10",
+    "ethers": "^6.8.1",
+    "ganache-cli": "^6.12.2",
     "hardhat": "^2.19.2",
     "hardhat-gas-reporter": "^1.0.9",
     "solidity-coverage": "^0.8.5",
-    "chai": "^4.3.10",
-    "ethers": "^6.8.1",
-    "typescript": "^5.3.3",
-    "@types/node": "^20.10.5",
-    "@types/mocha": "^10.0.6",
-    "ts-node": "^10.9.1"
+    "truffle": "^5.11.5",
+    "ts-node": "^10.9.1",
+    "typescript": "^5.3.3"
   }
 }
