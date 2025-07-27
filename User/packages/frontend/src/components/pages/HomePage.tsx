@@ -1,4 +1,5 @@
 import { useAuth } from '../../hooks/useAuth'
+import { ActivityLogger } from '../ActivityLogger'
 
 export function HomePage() {
     const { authenticated, user } = useAuth()
@@ -48,6 +49,11 @@ export function HomePage() {
                             <p className="text-lg text-slate-300 mb-12">
                                 Ready to discover amazing events and book your next experience?
                             </p>
+                            
+                            {/* Activity Logger Section */}
+                            <div className="mb-12">
+                                <ActivityLogger />
+                            </div>
                             
                             {/* Main Action Cards */}
                             <div className="grid md:grid-cols-3 gap-6 mb-12">

@@ -15,7 +15,7 @@ export const USER_AUTH_ABI = [
   "event UserLoggedOut(string indexed uid, address indexed wallet, uint256 timestamp)"
 ]
 
-// Contract address (update after Truffle deployment)
+// Contract address (deployed on Ganache)
 export const USER_AUTH_CONTRACT_ADDRESS = import.meta.env.VITE_USER_AUTH_CONTRACT_ADDRESS || ""
 
 export interface UserDetails {
@@ -37,7 +37,7 @@ export class UserAuthContract {
     this.signer = signer
     
     if (!USER_AUTH_CONTRACT_ADDRESS) {
-      throw new Error('USER_AUTH_CONTRACT_ADDRESS not configured. Please deploy contract and update .env file.')
+      throw new Error('USER_AUTH_CONTRACT_ADDRESS not configured. Please deploy contract to Ganache and update .env file.')
     }
     
     this.contract = new ethers.Contract(USER_AUTH_CONTRACT_ADDRESS, USER_AUTH_ABI, signer)

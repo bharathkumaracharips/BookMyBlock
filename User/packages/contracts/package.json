@@ -32,7 +32,7 @@
     "@types/mocha": "^10.0.6",
     "@types/node": "^20.10.5",
     "chai": "^4.3.10",
-    "ethers": "^6.8.1",
+    "ethers": "^6.15.0",
     "ganache-cli": "^6.12.2",
     "hardhat": "^2.19.2",
     "hardhat-gas-reporter": "^1.0.9",
