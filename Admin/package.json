@@ -10,6 +10,8 @@
     "build": "npm run build --workspaces",
     "test": "npm run test --workspaces",
     "dev": "concurrently \"npm run dev -w @bookmyblock/frontend\" \"npm run dev -w @bookmyblock/backend\"",
+    "dev:frontend": "npm run dev -w @bookmyblock/frontend",
+    "dev:backend": "npm run dev -w @bookmyblock/backend",
     "lint": "npm run lint --workspaces",
     "clean": "npm run clean --workspaces"
   },
