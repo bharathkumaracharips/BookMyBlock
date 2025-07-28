@@ -1,15 +1,213 @@
 /**
- * Simple Authentication Hook
+ * Simple Authentication Hook - Singleton Pattern
  * 
- * Web2-like authentication flow with blockchain transaction logging:
- * 1. New user -> signup transaction
- * 2. Existing user -> login transaction (no duplicates on refresh)
- * 3. User logout -> logout transaction
+ * Single source of truth for authentication across the entire app.
+ * Prevents multiple instances from running simultaneously.
  */
 
 import { usePrivy, useWallets } from '@privy-io/react-auth'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { BlockchainLogger } from '../services/blockchainLogger'
+
+// Singleton instance to prevent multiple authentication processing
+class AuthenticationManager {
+  private static instance: AuthenticationManager
+  private isProcessing = false
+  private currentUserId: string | null = null
+  private logger: BlockchainLogger | null = null
+  private processingTimeout: NodeJS.Timeout | null = null
+  private processedUsers: Set<string> = new Set()
+
+  private constructor() {}
+
+  static getInstance(): AuthenticationManager {
+    if (!AuthenticationManager.instance) {
+      AuthenticationManager.instance = new AuthenticationManager()
+    }
+    return AuthenticationManager.instance
+  }
+
+  async initializeLogger(): Promise<boolean> {
+    if (this.logger) return true
+    
+    try {
+      this.logger = new BlockchainLogger()
+      const success = await this.logger.initialize()
+      return success
+    } catch (error) {
+      console.error('Failed to initialize blockchain logger:', error)
+      return false
+    }
+  }
+
+  // Check if user is already logged in on blockchain
+  async isUserLoggedInOnBlockchain(userId: string): Promise<boolean> {
+    if (!this.logger) {
+      const success = await this.initializeLogger()
+      if (!success) return false
+    }
+
+    // Ensure logger is initialized
+    if (!this.logger) {
+      console.error('Blockchain logger not initialized')
+      return false
+    }
+
+    try {
+      const exists = await this.logger.userExists(userId)
+      if (!exists) return false
+      
+      return await this.logger.isUserLoggedIn(userId)
+    } catch (error) {
+      console.error('Failed to check blockchain login status:', error)
+      return false
+    }
+  }
+
+  // Check if user has been processed in this session
+  isUserProcessed(userId: string): boolean {
+    return this.processedUsers.has(userId)
+  }
+
+  // Mark user as processed
+  markUserProcessed(userId: string): void {
+    this.processedUsers.add(userId)
+  }
+
+  // Clear processed users (for logout)
+  clearProcessedUsers(): void {
+    this.processedUsers.clear()
+  }
+
+  async processAuthentication(userId: string, walletAddress: string): Promise<string | null> {
+    // Prevent multiple simultaneous processing
+    if (this.isProcessing) {
+      console.log('🔄 Authentication already in progress, skipping:', userId)
+      return null
+    }
+
+    // Prevent processing the same user multiple times
+    if (this.currentUserId === userId) {
+      console.log('🔄 User already being processed, skipping:', userId)
+      return null
+    }
+
+    // Check if user has already been processed in this session
+    if (this.isUserProcessed(userId)) {
+      console.log('🔄 User already processed in this session, skipping:', userId)
+      return null
+    }
+
+    this.isProcessing = true
+    this.currentUserId = userId
+
+    // Set a timeout to prevent stuck processing
+    this.processingTimeout = setTimeout(() => {
+      console.log('⏰ Processing timeout, clearing state')
+      this.isProcessing = false
+      this.currentUserId = null
+    }, 30000) // 30 seconds timeout
+
+    try {
+      console.log('🚀 Starting authentication processing for user:', userId)
+      
+      if (!this.logger) {
+        const success = await this.initializeLogger()
+        if (!success) {
+          throw new Error('Failed to initialize blockchain logger')
+        }
+      }
+
+      // Ensure logger is initialized
+      if (!this.logger) {
+        throw new Error('Blockchain logger not initialized')
+      }
+
+      // Check if user exists in blockchain
+      const userExists = await this.logger.userExists(userId)
+      
+      if (!userExists) {
+        // New user - create signup transaction
+        console.log('🆕 New user detected, creating signup transaction...')
+        const txHash = await this.logger.logSignup(userId, walletAddress)
+        console.log('✅ Signup transaction created:', txHash)
+        this.markUserProcessed(userId)
+        return txHash
+      } else {
+        // Check if user is already logged in on blockchain
+        const isAlreadyLoggedIn = await this.isUserLoggedInOnBlockchain(userId)
+        
+        if (isAlreadyLoggedIn) {
+          console.log('ℹ️ User already logged in on blockchain, skipping login transaction')
+          this.markUserProcessed(userId)
+          return null
+        } else {
+          // User exists but not logged in - create login transaction
+          console.log('🔑 Existing user login, creating login transaction for security audit...')
+          const txHash = await this.logger.logLogin(userId)
+          console.log('✅ Login transaction created:', txHash)
+          this.markUserProcessed(userId)
+          return txHash
+        }
+      }
+      
+    } catch (error: any) {
+      console.error('❌ Authentication processing failed:', error)
+      throw error
+    } finally {
+      this.isProcessing = false
+      this.currentUserId = null
+      if (this.processingTimeout) {
+        clearTimeout(this.processingTimeout)
+        this.processingTimeout = null
+      }
+    }
+  }
+
+  async processLogout(userId: string): Promise<string | null> {
+    if (!this.logger) {
+      console.log('Logger not initialized, skipping logout')
+      return null
+    }
+
+    try {
+      // Check if user is logged in on blockchain
+      const isLoggedIn = await this.logger.isUserLoggedIn(userId)
+      
+      if (isLoggedIn) {
+        console.log('🚪 User logout, creating logout transaction...')
+        const txHash = await this.logger.logLogout(userId)
+        console.log('✅ Logout transaction created:', txHash)
+        
+        // Clear user from processed list on logout
+        this.processedUsers.delete(userId)
+        
+        return txHash
+      } else {
+        console.log('ℹ️ User already logged out, no transaction needed')
+        
+        // Clear user from processed list even if no transaction
+        this.processedUsers.delete(userId)
+        
+        return null
+      }
+    } catch (error: any) {
+      console.error('❌ Logout failed:', error)
+      throw error
+    }
+  }
+
+  getLogger(): BlockchainLogger | null {
+    return this.logger
+  }
+
+  isCurrentlyProcessing(): boolean {
+    return this.isProcessing
+  }
+}
+
+// Global authentication manager instance
+const authManager = AuthenticationManager.getInstance()
 
 export function useSimpleAuth() {
   const { 
@@ -22,7 +220,6 @@ export function useSimpleAuth() {
   } = usePrivy()
   
   const { wallets } = useWallets()
-  const [logger, setLogger] = useState<BlockchainLogger | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [hasProcessedAuth, setHasProcessedAuth] = useState(false)
@@ -44,37 +241,9 @@ export function useSimpleAuth() {
                 : 'wallet'
   } : null
 
-  // Initialize blockchain logger
-  useEffect(() => {
-    const initLogger = async () => {
-      try {
-        const blockchainLogger = new BlockchainLogger()
-        const success = await blockchainLogger.initialize()
-        if (success) {
-          setLogger(blockchainLogger)
-        }
-      } catch (error) {
-        console.error('Failed to initialize blockchain logger:', error)
-      }
-    }
-    initLogger()
-  }, [])
-
-  // Cleanup localStorage on unmount
-  useEffect(() => {
-    return () => {
-      // Clear all auth processing flags on unmount
-      Object.keys(localStorage).forEach(key => {
-        if (key.startsWith('auth_processed_')) {
-          localStorage.removeItem(key)
-        }
-      })
-    }
-  }, [])
-
   // Handle authentication changes
   useEffect(() => {
-    if (!ready || !logger || !authenticated || !user || hasProcessedAuth) {
+    if (!ready || !authenticated || !user || hasProcessedAuth) {
       return
     }
 
@@ -84,21 +253,23 @@ export function useSimpleAuth() {
       return
     }
 
+    // Check if authentication manager is already processing
+    if (authManager.isCurrentlyProcessing()) {
+      console.log('🔄 Authentication manager is busy, skipping:', user.id)
+      return
+    }
+
+    // Check if user has already been processed in this session
+    if (authManager.isUserProcessed(user.id)) {
+      console.log('🔄 User already processed in this session, skipping:', user.id)
+      setHasProcessedAuth(true)
+      setLastProcessedUserId(user.id)
+      return
+    }
+
     const processAuth = async () => {
       if (!embeddedWallet?.address) {
         console.log('Waiting for wallet...')
-        return
-      }
-
-      // Check if we already processed this user in this session
-      const sessionKey = `auth_processed_${user.id}`
-      const lastProcessed = localStorage.getItem(sessionKey)
-      const now = Date.now()
-      
-      if (lastProcessed && (now - parseInt(lastProcessed)) < 60000) { // 1 minute cooldown
-        console.log('🔄 User recently processed, skipping duplicate:', user.id)
-        setHasProcessedAuth(true)
-        setLastProcessedUserId(user.id)
         return
       }
 
@@ -106,37 +277,16 @@ export function useSimpleAuth() {
       setError(null)
 
       try {
-        // Check if user exists in blockchain
-        const userExists = await logger.userExists(user.id)
+        const txHash = await authManager.processAuthentication(user.id, embeddedWallet.address)
         
-        if (!userExists) {
-          // New user - create signup transaction
-          console.log('🆕 New user detected, creating signup transaction...')
-          const txHash = await logger.logSignup(user.id, embeddedWallet.address)
-          if (txHash) {
-            console.log('✅ Signup transaction created:', txHash)
-          }
+        if (txHash) {
+          setHasProcessedAuth(true)
+          setLastProcessedUserId(user.id)
         } else {
-          // Existing user - check if already logged in
-          const isLoggedIn = await logger.isUserLoggedIn(user.id)
-          
-          if (!isLoggedIn) {
-            // User exists but not logged in - create login transaction
-            console.log('🔑 Existing user login, creating login transaction...')
-            const txHash = await logger.logLogin(user.id)
-            if (txHash) {
-              console.log('✅ Login transaction created:', txHash)
-            }
-          } else {
-            console.log('ℹ️ User already logged in, no transaction needed')
-          }
+          // Even if no transaction was created (user already logged in), mark as processed
+          setHasProcessedAuth(true)
+          setLastProcessedUserId(user.id)
         }
-        
-        setHasProcessedAuth(true)
-        setLastProcessedUserId(user.id)
-        
-        // Mark as processed in localStorage
-        localStorage.setItem(sessionKey, now.toString())
         
       } catch (error: any) {
         console.error('❌ Authentication processing failed:', error)
@@ -150,7 +300,7 @@ export function useSimpleAuth() {
     const timer = setTimeout(processAuth, 1000)
     return () => clearTimeout(timer)
     
-  }, [ready, logger, authenticated, user, embeddedWallet, hasProcessedAuth])
+  }, [ready, authenticated, user, embeddedWallet, hasProcessedAuth])
 
   // Reset processing state when user changes
   useEffect(() => {
@@ -162,7 +312,7 @@ export function useSimpleAuth() {
 
   // Handle logout
   const handleLogout = useCallback(async () => {
-    if (!logger || !user) {
+    if (!user) {
       await logout()
       return
     }
@@ -171,16 +321,7 @@ export function useSimpleAuth() {
     setError(null)
 
     try {
-      // Check if user is logged in on blockchain
-      const isLoggedIn = await logger.isUserLoggedIn(user.id)
-      
-      if (isLoggedIn) {
-        console.log('🚪 User logout, creating logout transaction...')
-        const txHash = await logger.logLogout(user.id)
-        if (txHash) {
-          console.log('✅ Logout transaction created:', txHash)
-        }
-      }
+      await authManager.processLogout(user.id)
       
       // Reset processing flags
       setHasProcessedAuth(false)
@@ -197,10 +338,11 @@ export function useSimpleAuth() {
     } finally {
       setIsLoading(false)
     }
-  }, [logger, user, logout])
+  }, [user, logout])
 
   // Get user blockchain status
   const getUserStatus = useCallback(async () => {
+    const logger = authManager.getLogger()
     if (!logger || !user) return null
     
     try {
@@ -210,7 +352,7 @@ export function useSimpleAuth() {
       console.error('Failed to get user status:', error)
       return null
     }
-  }, [logger, user])
+  }, [user])
 
   // API call helper
   const apiCall = async (endpoint: string, options: RequestInit = {}) => {
