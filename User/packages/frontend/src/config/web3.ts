@@ -1,51 +1,26 @@
 import type { PrivyClientConfig } from '@privy-io/react-auth'
 
-// Polygon chain configurations
-export const polygonMumbai = {
-  id: 80001,
-  name: 'Polygon Mumbai',
-  network: 'polygon-mumbai',
+// Ganache local blockchain configuration
+export const ganache = {
+  id: 5777,
+  name: 'Ganache Local',
+  network: 'ganache',
   nativeCurrency: {
     decimals: 18,
-    name: 'MATIC',
-    symbol: 'MATIC',
+    name: 'ETH',
+    symbol: 'ETH',
   },
   rpcUrls: {
     default: {
-      http: ['https://rpc-mumbai.maticvigil.com'],
+      http: ['http://127.0.0.1:7545'],
     },
     public: {
-      http: ['https://rpc-mumbai.maticvigil.com'],
+      http: ['http://127.0.0.1:7545'],
     },
-  },
-  blockExplorers: {
-    default: { name: 'PolygonScan', url: 'https://mumbai.polygonscan.com' },
   },
 }
 
-export const polygon = {
-  id: 137,
-  name: 'Polygon',
-  network: 'polygon',
-  nativeCurrency: {
-    decimals: 18,
-    name: 'MATIC',
-    symbol: 'MATIC',
-  },
-  rpcUrls: {
-    default: {
-      http: ['https://polygon-rpc.com'],
-    },
-    public: {
-      http: ['https://polygon-rpc.com'],
-    },
-  },
-  blockExplorers: {
-    default: { name: 'PolygonScan', url: 'https://polygonscan.com' },
-  },
-}
-
-// Privy configuration for User dashboard - isolated authentication
+// Privy configuration for User dashboard with Ganache
 export const privyConfig = {
   appId: import.meta.env.VITE_PRIVY_APP_ID || 'cmdixityf004cl10kymjigdke',
   config: {
@@ -53,7 +28,7 @@ export const privyConfig = {
     appearance: {
       theme: 'dark',
       accentColor: '#8b5cf6',
-      logo: undefined, // Remove Privy logo
+      logo: undefined,
       showWalletLoginFirst: false,
       walletChainType: 'ethereum-only',
     },
@@ -62,9 +37,8 @@ export const privyConfig = {
       requireUserPasswordOnCreate: false,
       showWalletUIs: false,
     },
-    defaultChain: polygonMumbai,
-    supportedChains: [polygonMumbai, polygon],
-    // Custom branding
+    defaultChain: ganache,
+    supportedChains: [ganache],
     legal: {
       termsAndConditionsUrl: 'https://bookmyblock.com/terms',
       privacyPolicyUrl: 'https://bookmyblock.com/privacy',
@@ -72,4 +46,4 @@ export const privyConfig = {
   } as PrivyClientConfig,
 }
 
-export const supportedChains = [polygonMumbai, polygon]
+export const supportedChains = [ganache]

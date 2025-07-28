@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect } from 'react'
-import { useAuth } from '../../hooks/useAuth'
+import { useSimpleAuth } from '../../hooks/useSimpleAuth'
 
 export function ProfileDropdown() {
-  const { authenticated, user, embeddedWallet, logout } = useAuth()
+  const { authenticated, user, embeddedWallet, logout } = useSimpleAuth()
   const [isOpen, setIsOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
@@ -20,7 +20,7 @@ export function ProfileDropdown() {
 
   if (!authenticated || !user) return null
 
-  const displayName = user.email || user.phone || user.google || user.apple || 'User'
+  const displayName = String(user.email || user.phone || user.google || user.apple || 'User')
   const initials = displayName.split('@')[0].slice(0, 2).toUpperCase()
   const userName = displayName.split('@')[0]
 

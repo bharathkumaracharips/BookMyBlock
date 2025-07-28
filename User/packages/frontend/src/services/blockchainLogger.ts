@@ -4,9 +4,8 @@ import { USER_AUTH_ABI } from '../contracts/UserAuth'
 /**
  * Blockchain Logger Service
  * 
- * This service handles logging user activities to the Ganache blockchain
- * independently of Privy's authentication network. It uses a direct connection
- * to Ganache for storing activity logs.
+ * Handles logging user activities to Ganache blockchain using Truffle deployment.
+ * Provides direct connection to local Ganache for storing authentication logs.
  */
 export class BlockchainLogger {
   private provider: ethers.JsonRpcProvider
@@ -15,7 +14,7 @@ export class BlockchainLogger {
   private eventListeners: Map<string, any> = new Map()
 
   constructor() {
-    // Direct connection to Ganache
+    // Connect to local Ganache blockchain
     const ganacheRPC = import.meta.env.VITE_GANACHE_RPC_URL || 'http://127.0.0.1:7545'
     this.provider = new ethers.JsonRpcProvider(ganacheRPC)
     

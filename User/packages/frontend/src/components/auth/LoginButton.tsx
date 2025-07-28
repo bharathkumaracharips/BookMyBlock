@@ -1,8 +1,9 @@
-import { useAuth } from '../../hooks/useAuth'
+import React from 'react'
+import { useSimpleAuth } from '../../hooks/useSimpleAuth'
 import { ProfileDropdown } from '../profile/ProfileDropdown'
 
 export function LoginButton() {
-  const { ready, authenticated, login } = useAuth()
+  const { ready, authenticated, login, isLoading } = useSimpleAuth()
 
   if (!ready) {
     return (
@@ -13,15 +14,35 @@ export function LoginButton() {
   }
 
   if (authenticated) {
-    return <ProfileDropdown />
+    return (
+      <div className="flex items-center space-x-2">
+        {isLoading && (
+          <div className="flex items-center text-sm text-gray-600">
+            <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mr-2"></div>
+            Processing...
+          </div>
+        )}
+        <ProfileDropdown />
+      </div>
+    )
   }
 
   return (
     <button
       onClick={login}
-      className="px-6 py-2.5 bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-600 hover:to-purple-700 text-white rounded-xl font-semibold text-sm shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
+      disabled={isLoading}
+      className={`px-6 py-2.5 bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-600 hover:to-purple-700 text-white rounded-xl font-semibold text-sm shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105 ${
+        isLoading ? 'opacity-50 cursor-not-allowed' : ''
+      }`}
     >
-      Sign In
+      {isLoading ? (
+        <div className="flex items-center">
+          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+          Signing In...
+        </div>
+      ) : (
+        'Sign In'
+      )}
     </button>
   )
 }

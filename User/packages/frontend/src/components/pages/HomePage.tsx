@@ -1,8 +1,8 @@
-import { useAuth } from '../../hooks/useAuth'
+import { useSimpleAuth } from '../../hooks/useSimpleAuth'
 import { ActivityLogger } from '../ActivityLogger'
 
 export function HomePage() {
-    const { authenticated, user } = useAuth()
+    const { authenticated, user } = useSimpleAuth()
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 pt-20">
