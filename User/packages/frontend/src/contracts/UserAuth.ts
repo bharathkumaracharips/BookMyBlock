@@ -1,22 +1,7 @@
 import { ethers } from 'ethers'
+import UserAuthContract from '../../../contracts/build/contracts/UserAuth.json'
 
-// UserAuth Contract ABI (simplified for key functions)
-export const USER_AUTH_ABI = [
-  "function signup(string uid, address walletAddress) public",
-  "function login(string uid) public", 
-  "function logout(string uid) public",
-  "function fetchUserDetails(string uid) public view returns (string, address, bool, bool, string, uint256, uint256, uint256)",
-  "function getUserByWallet(address walletAddress) public view returns (string)",
-  "function userExists(string uid) public view returns (bool)",
-  "function isUserLoggedIn(string uid) public view returns (bool)",
-  "function getUserLoginCount(string uid) public view returns (uint256)",
-  "event UserSignedUp(string indexed uid, address indexed wallet, uint256 timestamp)",
-  "event UserLoggedIn(string indexed uid, address indexed wallet, uint256 timestamp, uint256 loginCount)",
-  "event UserLoggedOut(string indexed uid, address indexed wallet, uint256 timestamp)"
-]
-
-// Contract address (deployed on Ganache)
-export const USER_AUTH_CONTRACT_ADDRESS = import.meta.env.VITE_USER_AUTH_CONTRACT_ADDRESS || ""
+export const USER_AUTH_ABI = UserAuthContract.abi
 
 export interface UserDetails {
   uid: string
@@ -24,119 +9,131 @@ export interface UserDetails {
   isSignedUp: boolean
   isLoggedIn: boolean
   lastAction: string
-  lastTimestamp: number
-  loginCount: number
   signupTimestamp: number
+  lastActionTimestamp: number
+  loginCount: number
 }
 
-export class UserAuthContract {
-  private contract: ethers.Contract
-  private signer: ethers.Signer
+export class UserAuthContractService {
+  private contract: ethers.Contract | null = null
+  private signer: ethers.Signer | null = null
 
-  constructor(signer: ethers.Signer) {
-    this.signer = signer
+  async initialize(provider: ethers.Provider, signer: ethers.Signer): Promise<boolean> {
+    try {
+      this.signer = signer
+      
+      // Get contract address from networks, with fallback
+      const networks = UserAuthContract.networks as any
+      const contractAddress = networks[1337]?.address || networks[5777]?.address || ''
+      
+      if (!contractAddress) {
+        throw new Error('Contract address not found in networks')
+      }
+      
+      this.contract = new ethers.Contract(
+        contractAddress,
+        USER_AUTH_ABI,
+        signer
+      )
+      return true
+    } catch (error) {
+      console.error('Failed to initialize UserAuth contract:', error)
+      return false
+    }
+  }
+
+  async signup(uid: string, walletAddress: string): Promise<string> {
+    if (!this.contract) throw new Error('Contract not initialized')
     
-    if (!USER_AUTH_CONTRACT_ADDRESS) {
-      throw new Error('USER_AUTH_CONTRACT_ADDRESS not configured. Please deploy contract to Ganache and update .env file.')
-    }
+    const tx = await this.contract.signup(uid, walletAddress)
+    const receipt = await tx.wait()
+    return receipt.hash
+  }
+
+  async login(uid: string): Promise<string> {
+    if (!this.contract) throw new Error('Contract not initialized')
     
-    this.contract = new ethers.Contract(USER_AUTH_CONTRACT_ADDRESS, USER_AUTH_ABI, signer)
+    const tx = await this.contract.login(uid)
+    const receipt = await tx.wait()
+    return receipt.hash
   }
 
-  /**
-   * Sign up a new user
-   */
-  async signup(uid: string, walletAddress: string): Promise<ethers.TransactionResponse> {
-    try {
-      const tx = await this.contract.signup(uid, walletAddress)
-      return tx
-    } catch (error) {
-      console.error('Signup failed:', error)
-      throw error
-    }
+  async logout(uid: string): Promise<string> {
+    if (!this.contract) throw new Error('Contract not initialized')
+    
+    const tx = await this.contract.logout(uid)
+    const receipt = await tx.wait()
+    return receipt.hash
   }
 
-  /**
-   * Login a user
-   */
-  async login(uid: string): Promise<ethers.TransactionResponse> {
+  async getUserDetails(uid: string): Promise<UserDetails | null> {
+    if (!this.contract) throw new Error('Contract not initialized')
+    
     try {
-      const tx = await this.contract.login(uid)
-      return tx
-    } catch (error) {
-      console.error('Login failed:', error)
-      throw error
-    }
-  }
-
-  /**
-   * Logout a user
-   */
-  async logout(uid: string): Promise<ethers.TransactionResponse> {
-    try {
-      const tx = await this.contract.logout(uid)
-      return tx
-    } catch (error) {
-      console.error('Logout failed:', error)
-      throw error
-    }
-  }
-
-  /**
-   * Get user details
-   */
-  async getUserDetails(uid: string): Promise<UserDetails> {
-    try {
-      const result = await this.contract.fetchUserDetails(uid)
+      const details = await this.contract.fetchUserDetails(uid)
       return {
-        uid: result[0],
-        walletAddress: result[1],
-        isSignedUp: result[2],
-        isLoggedIn: result[3],
-        lastAction: result[4],
-        lastTimestamp: Number(result[5]),
-        loginCount: Number(result[6]),
-        signupTimestamp: Number(result[7])
+        uid: details[0],
+        walletAddress: details[1],
+        isSignedUp: details[2],
+        isLoggedIn: details[3],
+        lastAction: details[4],
+        signupTimestamp: Number(details[5]),
+        lastActionTimestamp: Number(details[6]),
+        loginCount: Number(details[7])
       }
     } catch (error) {
       console.error('Failed to get user details:', error)
-      throw error
+      return null
     }
   }
 
-  /**
-   * Check if user exists
-   */
   async userExists(uid: string): Promise<boolean> {
+    if (!this.contract) throw new Error('Contract not initialized')
+    
     try {
       return await this.contract.userExists(uid)
     } catch (error) {
-      console.error('Failed to check user existence:', error)
+      console.error('Failed to check if user exists:', error)
       return false
     }
   }
 
-  /**
-   * Check if user is logged in
-   */
   async isUserLoggedIn(uid: string): Promise<boolean> {
+    if (!this.contract) throw new Error('Contract not initialized')
+    
     try {
       return await this.contract.isUserLoggedIn(uid)
     } catch (error) {
-      console.error('Failed to check login status:', error)
+      console.error('Failed to check if user is logged in:', error)
       return false
     }
   }
 
-  /**
-   * Get user by wallet address
-   */
-  async getUserByWallet(walletAddress: string): Promise<string> {
+  async getUserLoginCount(uid: string): Promise<number> {
+    if (!this.contract) throw new Error('Contract not initialized')
+    
     try {
-      return await this.contract.getUserByWallet(walletAddress)
+      const count = await this.contract.getUserLoginCount(uid)
+      return Number(count)
+    } catch (error) {
+      console.error('Failed to get user login count:', error)
+      return 0
+    }
+  }
+
+  async getUserByWallet(walletAddress: string): Promise<string | null> {
+    if (!this.contract) throw new Error('Contract not initialized')
+    
+    try {
+      const uid = await this.contract.getUserByWallet(walletAddress)
+      return uid || null
     } catch (error) {
       console.error('Failed to get user by wallet:', error)
-      throw error
+      return null
     }
+  }
+
+  getContract(): ethers.Contract | null {
+    return this.contract
   }
 }
