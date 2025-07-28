@@ -82,19 +82,16 @@ class AuthenticationManager {
   async processAuthentication(userId: string, walletAddress: string): Promise<string | null> {
     // Prevent multiple simultaneous processing
     if (this.isProcessing) {
-      console.log('🔄 Authentication already in progress, skipping:', userId)
       return null
     }
 
     // Prevent processing the same user multiple times
     if (this.currentUserId === userId) {
-      console.log('🔄 User already being processed, skipping:', userId)
       return null
     }
 
     // Check if user has already been processed in this session
     if (this.isUserProcessed(userId)) {
-      console.log('🔄 User already processed in this session, skipping:', userId)
       return null
     }
 
@@ -103,14 +100,11 @@ class AuthenticationManager {
 
     // Set a timeout to prevent stuck processing
     this.processingTimeout = setTimeout(() => {
-      console.log('⏰ Processing timeout, clearing state')
       this.isProcessing = false
       this.currentUserId = null
     }, 30000) // 30 seconds timeout
 
     try {
-      console.log('🚀 Starting authentication processing for user:', userId)
-      
       if (!this.logger) {
         const success = await this.initializeLogger()
         if (!success) {
@@ -128,9 +122,7 @@ class AuthenticationManager {
       
       if (!userExists) {
         // New user - create signup transaction
-        console.log('🆕 New user detected, creating signup transaction...')
         const txHash = await this.logger.logSignup(userId, walletAddress)
-        console.log('✅ Signup transaction created:', txHash)
         this.markUserProcessed(userId)
         return txHash
       } else {
@@ -138,21 +130,18 @@ class AuthenticationManager {
         const isAlreadyLoggedIn = await this.isUserLoggedInOnBlockchain(userId)
         
         if (isAlreadyLoggedIn) {
-          console.log('ℹ️ User already logged in on blockchain, skipping login transaction')
           this.markUserProcessed(userId)
           return null
         } else {
           // User exists but not logged in - create login transaction
-          console.log('🔑 Existing user login, creating login transaction for security audit...')
           const txHash = await this.logger.logLogin(userId)
-          console.log('✅ Login transaction created:', txHash)
           this.markUserProcessed(userId)
           return txHash
         }
       }
       
     } catch (error: any) {
-      console.error('❌ Authentication processing failed:', error)
+      console.error('Authentication processing failed:', error)
       throw error
     } finally {
       this.isProcessing = false
@@ -166,7 +155,6 @@ class AuthenticationManager {
 
   async processLogout(userId: string): Promise<string | null> {
     if (!this.logger) {
-      console.log('Logger not initialized, skipping logout')
       return null
     }
 
@@ -175,24 +163,20 @@ class AuthenticationManager {
       const isLoggedIn = await this.logger.isUserLoggedIn(userId)
       
       if (isLoggedIn) {
-        console.log('🚪 User logout, creating logout transaction...')
         const txHash = await this.logger.logLogout(userId)
-        console.log('✅ Logout transaction created:', txHash)
         
         // Clear user from processed list on logout
         this.processedUsers.delete(userId)
         
         return txHash
       } else {
-        console.log('ℹ️ User already logged out, no transaction needed')
-        
         // Clear user from processed list even if no transaction
         this.processedUsers.delete(userId)
         
         return null
       }
     } catch (error: any) {
-      console.error('❌ Logout failed:', error)
+      console.error('Logout failed:', error)
       throw error
     }
   }
@@ -249,19 +233,16 @@ export function useSimpleAuth() {
 
     // Prevent processing the same user multiple times
     if (lastProcessedUserId === user.id) {
-      console.log('🔄 User already processed, skipping:', user.id)
       return
     }
 
     // Check if authentication manager is already processing
     if (authManager.isCurrentlyProcessing()) {
-      console.log('🔄 Authentication manager is busy, skipping:', user.id)
       return
     }
 
     // Check if user has already been processed in this session
     if (authManager.isUserProcessed(user.id)) {
-      console.log('🔄 User already processed in this session, skipping:', user.id)
       setHasProcessedAuth(true)
       setLastProcessedUserId(user.id)
       return
@@ -269,7 +250,6 @@ export function useSimpleAuth() {
 
     const processAuth = async () => {
       if (!embeddedWallet?.address) {
-        console.log('Waiting for wallet...')
         return
       }
 
@@ -289,7 +269,7 @@ export function useSimpleAuth() {
         }
         
       } catch (error: any) {
-        console.error('❌ Authentication processing failed:', error)
+        console.error('Authentication processing failed:', error)
         setError(error.message || 'Authentication failed')
       } finally {
         setIsLoading(false)
@@ -331,7 +311,7 @@ export function useSimpleAuth() {
       await logout()
       
     } catch (error: any) {
-      console.error('❌ Logout failed:', error)
+      console.error('Logout failed:', error)
       setError(error.message || 'Logout failed')
       // Still logout from Privy even if blockchain logout fails
       await logout()
