@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import { useAuth } from '../../hooks/useAuth'
+import { useSimpleAuth } from '../../hooks/useSimpleAuth'
 
 export function WalletInfo() {
-  const { authenticated, user, embeddedWallet, apiCall } = useAuth()
+  const { authenticated, user, embeddedWallet, apiCall } = useSimpleAuth()
   const [profileData, setProfileData] = useState<any>(null)
   const [loading, setLoading] = useState(false)
 

@@ -206,11 +206,14 @@ export class BlockchainLogger {
         gasEstimate = 300000n
       }
 
+      console.log('📝 Admin: Sending logout transaction...')
       const tx = await this.contract.logout(uid, {
         gasLimit: gasEstimate + 50000n // Add buffer to gas estimate
       })
 
+      console.log('⏳ Admin: Waiting for transaction receipt...')
       const receipt = await tx.wait()
+      console.log('✅ Admin: Logout transaction successful:', receipt.hash)
 
       return receipt.hash
     } catch (error: any) {

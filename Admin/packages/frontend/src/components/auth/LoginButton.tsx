@@ -1,8 +1,8 @@
-import { useAuth } from '../../hooks/useAuth'
+import { useSimpleAuth } from '../../hooks/useSimpleAuth'
 import { ProfileDropdown } from '../profile/ProfileDropdown'
 
 export function LoginButton() {
-  const { ready, authenticated, login } = useAuth()
+  const { ready, authenticated, login } = useSimpleAuth()
 
   if (!ready) {
     return (

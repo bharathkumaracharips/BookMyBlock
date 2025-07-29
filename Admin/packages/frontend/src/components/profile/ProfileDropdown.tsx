@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect } from 'react'
-import { useAuth } from '../../hooks/useAuth'
+import { useSimpleAuth } from '../../hooks/useSimpleAuth'
 
 export function ProfileDropdown() {
-  const { authenticated, user, embeddedWallet, logout } = useAuth()
+  const { authenticated, user, embeddedWallet, logout } = useSimpleAuth()
   const [isOpen, setIsOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
@@ -55,7 +55,7 @@ export function ProfileDropdown() {
           </div>
           <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-400 rounded-full border-2 border-slate-900"></div>
         </div>
-        
+
         {/* User Info */}
         <div className="hidden sm:block text-left">
           <p className="text-sm font-medium text-white">{userName}</p>
@@ -63,10 +63,10 @@ export function ProfileDropdown() {
         </div>
 
         {/* Dropdown Arrow */}
-        <svg 
-          className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} 
-          fill="none" 
-          stroke="currentColor" 
+        <svg
+          className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
+          fill="none"
+          stroke="currentColor"
           viewBox="0 0 24 24"
         >
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
