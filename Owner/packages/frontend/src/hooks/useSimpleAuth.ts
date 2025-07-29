@@ -154,29 +154,37 @@ class AuthenticationManager {
   }
 
   async processLogout(userId: string): Promise<string | null> {
+    console.log('🚪 Owner Auth: Starting processLogout for user:', userId)
+    
     if (!this.logger) {
+      console.log('❌ Owner Auth: No logger available for logout')
       return null
     }
 
     try {
       // Check if user is logged in on blockchain
+      console.log('🔍 Owner Auth: Checking if user is logged in on blockchain...')
       const isLoggedIn = await this.logger.isUserLoggedIn(userId)
+      console.log('🔍 Owner Auth: User is logged in on blockchain:', isLoggedIn)
       
       if (isLoggedIn) {
+        console.log('🚪 Owner Auth: User is logged in, calling logLogout...')
         const txHash = await this.logger.logLogout(userId)
+        console.log('✅ Owner Auth: Logout transaction hash:', txHash)
         
         // Clear user from processed list on logout
         this.processedUsers.delete(userId)
         
         return txHash
       } else {
+        console.log('ℹ️ Owner Auth: User not logged in on blockchain, no logout transaction needed')
         // Clear user from processed list even if no transaction
         this.processedUsers.delete(userId)
         
         return null
       }
     } catch (error: any) {
-      console.error('Logout failed:', error)
+      console.error('❌ Owner Auth: Logout failed:', error)
       throw error
     }
   }

@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect } from 'react'
-import { useAuth } from '../../hooks/useAuth'
+import { useSimpleAuth } from '../../hooks/useSimpleAuth'
 
 export function ProfileDropdown() {
-  const { authenticated, user, embeddedWallet, logout } = useAuth()
+  const { authenticated, user, embeddedWallet, logout } = useSimpleAuth()
   const [isOpen, setIsOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
 

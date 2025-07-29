@@ -60,14 +60,14 @@ export class BlockchainLogger {
 
       let gasEstimate
       try {
-        gasEstimate = await this.contract.signup.estimateGas(uid, walletAddress)
+        gasEstimate = await this.contract.signup.estimateGas(uid, walletAddress, "Default Venue")
       } catch (gasError) {
         console.warn('Gas estimation failed, using default:', gasError)
         gasEstimate = 300000n
       }
 
-      const tx = await this.contract.signup(uid, walletAddress, {
-        gasLimit: Number(gasEstimate + 50000n)
+      const tx = await this.contract.signup(uid, walletAddress, "Default Venue", {
+        gasLimit: gasEstimate + 50000n // Add buffer to gas estimate
       })
 
       const receipt = await tx.wait()
@@ -108,7 +108,7 @@ export class BlockchainLogger {
       }
 
       const tx = await this.contract.login(uid, {
-        gasLimit: Number(gasEstimate + 50000n)
+        gasLimit: gasEstimate + 50000n // Add buffer to gas estimate
       })
 
       const receipt = await tx.wait()
@@ -129,35 +129,49 @@ export class BlockchainLogger {
   }
 
   async logLogout(uid: string): Promise<string | null> {
+    console.log('🚪 Owner: Attempting to log logout for user:', uid)
+
     if (!this.signer) {
-      console.error('Blockchain Logger not initialized')
+      console.error('❌ Owner: Blockchain Logger not initialized')
       return null
     }
 
     try {
+      console.log('🔍 Owner: Checking if user exists...')
       const exists = await this.contract.userExists(uid)
+      console.log('🔍 Owner: User exists:', exists)
+
       if (!exists) {
         throw new Error('User not found')
       }
 
+      console.log('🔍 Owner: Checking if user is logged in...')
       const isLoggedIn = await this.contract.isUserLoggedIn(uid)
+      console.log('🔍 Owner: User is logged in:', isLoggedIn)
+
       if (!isLoggedIn) {
+        console.log('ℹ️ Owner: User is not logged in, skipping logout transaction')
         return null
       }
 
       let gasEstimate
       try {
         gasEstimate = await this.contract.logout.estimateGas(uid)
+        console.log('⛽ Owner: Gas estimate:', gasEstimate.toString())
       } catch (gasError) {
-        console.warn('Gas estimation failed, using default:', gasError)
+        console.warn('⚠️ Owner: Gas estimation failed, using default:', gasError)
         gasEstimate = 300000n
       }
 
+      console.log('📝 Owner: Sending logout transaction...')
       const tx = await this.contract.logout(uid, {
-        gasLimit: Number(gasEstimate + 50000n)
+        gasLimit: gasEstimate + 50000n // Add buffer to gas estimate
       })
 
+      console.log('⏳ Owner: Waiting for transaction receipt...')
       const receipt = await tx.wait()
+      console.log('✅ Owner: Logout transaction successful:', receipt.hash)
+
       return receipt.hash
     } catch (error: any) {
       console.error('Failed to log logout:', error)
@@ -216,21 +230,22 @@ export class BlockchainLogger {
   }
 
   startEventListening(callback?: (event: any) => void) {
-    this.contract.on('UserSignedUp', (uid, wallet, timestamp, event) => {
+    this.contract.on('OwnerSignedUp', (uid, wallet, timestamp, venueName, event) => {
       callback?.({
-        type: 'UserSignedUp',
+        type: 'OwnerSignedUp',
         uid,
         wallet,
         timestamp: Number(timestamp),
+        venueName,
         blockNumber: event.blockNumber,
         transactionHash: event.transactionHash,
         date: new Date(Number(timestamp) * 1000).toLocaleString()
       })
     })
 
-    this.contract.on('UserLoggedIn', (uid, wallet, timestamp, loginCount, event) => {
+    this.contract.on('OwnerLoggedIn', (uid, wallet, timestamp, loginCount, event) => {
       callback?.({
-        type: 'UserLoggedIn',
+        type: 'OwnerLoggedIn',
         uid,
         wallet,
         timestamp: Number(timestamp),
@@ -241,9 +256,9 @@ export class BlockchainLogger {
       })
     })
 
-    this.contract.on('UserLoggedOut', (uid, wallet, timestamp, event) => {
+    this.contract.on('OwnerLoggedOut', (uid, wallet, timestamp, event) => {
       callback?.({
-        type: 'UserLoggedOut',
+        type: 'OwnerLoggedOut',
         uid,
         wallet,
         timestamp: Number(timestamp),
@@ -263,58 +278,64 @@ export class BlockchainLogger {
     try {
       const events = []
 
-      const signupFilter = this.contract.filters.UserSignedUp(uid)
-      const loginFilter = this.contract.filters.UserLoggedIn(uid)
-      const logoutFilter = this.contract.filters.UserLoggedOut(uid)
+      // Get OwnerSignedUp events
+      const signupFilter = this.contract.filters.OwnerSignedUp(uid)
+      const signupEvents = await this.contract.queryFilter(signupFilter, fromBlock)
 
-      const [signupEvents, loginEvents, logoutEvents] = await Promise.all([
-        this.contract.queryFilter(signupFilter, fromBlock),
-        this.contract.queryFilter(loginFilter, fromBlock),
-        this.contract.queryFilter(logoutFilter, fromBlock)
-      ])
-
-      for (const e of signupEvents) {
-        const log = e as ethers.EventLog
+      for (const event of signupEvents) {
+        const eventLog = event as ethers.EventLog
         events.push({
-          type: 'UserSignedUp',
-          uid: log.args[0],
-          wallet: log.args[1],
-          timestamp: Number(log.args[2]),
-          blockNumber: log.blockNumber,
-          transactionHash: log.transactionHash,
-          date: new Date(Number(log.args[2]) * 1000).toLocaleString()
+          type: 'OwnerSignedUp',
+          uid: eventLog.args[0],
+          wallet: eventLog.args[1],
+          timestamp: Number(eventLog.args[2]),
+          venueName: eventLog.args[3],
+          blockNumber: eventLog.blockNumber,
+          transactionHash: eventLog.transactionHash,
+          date: new Date(Number(eventLog.args[2]) * 1000).toLocaleString()
         })
       }
 
-      for (const e of loginEvents) {
-        const log = e as ethers.EventLog
+      // Get OwnerLoggedIn events
+      const loginFilter = this.contract.filters.OwnerLoggedIn(uid)
+      const loginEvents = await this.contract.queryFilter(loginFilter, fromBlock)
+
+      for (const event of loginEvents) {
+        const eventLog = event as ethers.EventLog
         events.push({
-          type: 'UserLoggedIn',
-          uid: log.args[0],
-          wallet: log.args[1],
-          timestamp: Number(log.args[2]),
-          loginCount: Number(log.args[3]),
-          blockNumber: log.blockNumber,
-          transactionHash: log.transactionHash,
-          date: new Date(Number(log.args[2]) * 1000).toLocaleString()
+          type: 'OwnerLoggedIn',
+          uid: eventLog.args[0],
+          wallet: eventLog.args[1],
+          timestamp: Number(eventLog.args[2]),
+          loginCount: Number(eventLog.args[3]),
+          blockNumber: eventLog.blockNumber,
+          transactionHash: eventLog.transactionHash,
+          date: new Date(Number(eventLog.args[2]) * 1000).toLocaleString()
         })
       }
 
-      for (const e of logoutEvents) {
-        const log = e as ethers.EventLog
+      // Get OwnerLoggedOut events
+      const logoutFilter = this.contract.filters.OwnerLoggedOut(uid)
+      const logoutEvents = await this.contract.queryFilter(logoutFilter, fromBlock)
+
+      for (const event of logoutEvents) {
+        const eventLog = event as ethers.EventLog
         events.push({
-          type: 'UserLoggedOut',
-          uid: log.args[0],
-          wallet: log.args[1],
-          timestamp: Number(log.args[2]),
-          blockNumber: log.blockNumber,
-          transactionHash: log.transactionHash,
-          date: new Date(Number(log.args[2]) * 1000).toLocaleString()
+          type: 'OwnerLoggedOut',
+          uid: eventLog.args[0],
+          wallet: eventLog.args[1],
+          timestamp: Number(eventLog.args[2]),
+          blockNumber: eventLog.blockNumber,
+          transactionHash: eventLog.transactionHash,
+          date: new Date(Number(eventLog.args[2]) * 1000).toLocaleString()
         })
       }
 
+      // Sort events by timestamp
       events.sort((a, b) => a.timestamp - b.timestamp)
+
       return events
+
     } catch (error: any) {
       console.error('Failed to fetch user events:', error)
       return []
@@ -326,8 +347,66 @@ export class BlockchainLogger {
       const currentBlock = await this.provider.getBlockNumber()
       const fromBlock = Math.max(0, currentBlock - blockRange)
 
-      const events = await this.getUserEvents('', fromBlock)
-      return events.sort((a, b) => b.timestamp - a.timestamp)
+      const events = []
+
+      // Get all OwnerSignedUp events
+      const signupFilter = this.contract.filters.OwnerSignedUp()
+      const signupEvents = await this.contract.queryFilter(signupFilter, fromBlock)
+
+      for (const event of signupEvents) {
+        const eventLog = event as ethers.EventLog
+        events.push({
+          type: 'OwnerSignedUp',
+          uid: eventLog.args[0],
+          wallet: eventLog.args[1],
+          timestamp: Number(eventLog.args[2]),
+          venueName: eventLog.args[3],
+          blockNumber: eventLog.blockNumber,
+          transactionHash: eventLog.transactionHash,
+          date: new Date(Number(eventLog.args[2]) * 1000).toLocaleString()
+        })
+      }
+
+      // Get all OwnerLoggedIn events
+      const loginFilter = this.contract.filters.OwnerLoggedIn()
+      const loginEvents = await this.contract.queryFilter(loginFilter, fromBlock)
+
+      for (const event of loginEvents) {
+        const eventLog = event as ethers.EventLog
+        events.push({
+          type: 'OwnerLoggedIn',
+          uid: eventLog.args[0],
+          wallet: eventLog.args[1],
+          timestamp: Number(eventLog.args[2]),
+          loginCount: Number(eventLog.args[3]),
+          blockNumber: eventLog.blockNumber,
+          transactionHash: eventLog.transactionHash,
+          date: new Date(Number(eventLog.args[2]) * 1000).toLocaleString()
+        })
+      }
+
+      // Get all OwnerLoggedOut events
+      const logoutFilter = this.contract.filters.OwnerLoggedOut()
+      const logoutEvents = await this.contract.queryFilter(logoutFilter, fromBlock)
+
+      for (const event of logoutEvents) {
+        const eventLog = event as ethers.EventLog
+        events.push({
+          type: 'OwnerLoggedOut',
+          uid: eventLog.args[0],
+          wallet: eventLog.args[1],
+          timestamp: Number(eventLog.args[2]),
+          blockNumber: eventLog.blockNumber,
+          transactionHash: eventLog.transactionHash,
+          date: new Date(Number(eventLog.args[2]) * 1000).toLocaleString()
+        })
+      }
+
+      // Sort events by timestamp (most recent first)
+      events.sort((a, b) => b.timestamp - a.timestamp)
+
+      return events
+
     } catch (error: any) {
       console.error('Failed to fetch recent events:', error)
       return []
@@ -336,17 +415,21 @@ export class BlockchainLogger {
 
   async testConnection(): Promise<boolean> {
     try {
+      // Test basic connection
       const network = await this.provider.getNetwork()
       const blockNumber = await this.provider.getBlockNumber()
-      const contractAddress = await this.contract.getAddress()
-      const code = await this.provider.getCode(contractAddress)
 
-      if (code === '0x') {
+      // Test contract deployment
+      const contractAddress = await this.contract.getAddress()
+      const contractCode = await this.provider.getCode(contractAddress)
+
+      if (contractCode === '0x') {
         console.error('Contract not found at address:', contractAddress)
         return false
       }
 
       return true
+
     } catch (error: any) {
       console.error('Connection test failed:', error)
       return false

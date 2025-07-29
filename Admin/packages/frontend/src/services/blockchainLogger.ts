@@ -10,19 +10,19 @@ import { USER_AUTH_ABI } from '../contracts/UserAuth'
 export class BlockchainLogger {
   private provider: ethers.JsonRpcProvider
   private contract: ethers.Contract
-  private signer: ethers.Wallet | null = null
+  private signer: ethers.Signer | null = null
   private eventListeners: Map<string, any> = new Map()
 
   constructor() {
     // Connect to local Ganache blockchain
     const ganacheRPC = import.meta.env.VITE_GANACHE_RPC_URL || 'http://127.0.0.1:7545'
     this.provider = new ethers.JsonRpcProvider(ganacheRPC)
-    
+
     const contractAddress = import.meta.env.VITE_USER_AUTH_CONTRACT_ADDRESS
     if (!contractAddress) {
       throw new Error('Contract address not configured')
     }
-    
+
     // Create contract instance (will add signer later)
     this.contract = new ethers.Contract(contractAddress, USER_AUTH_ABI, this.provider) as ethers.Contract
   }
@@ -44,10 +44,10 @@ export class BlockchainLogger {
           throw new Error('No accounts available in Ganache')
         }
       }
-      
+
       // Connect contract with signer
       this.contract = this.contract.connect(this.signer) as ethers.Contract
-      
+
       return true
     } catch (error) {
       console.error('Failed to initialize Blockchain Logger:', error)
@@ -59,37 +59,43 @@ export class BlockchainLogger {
    * Log user signup activity
    */
   async logSignup(uid: string, walletAddress: string): Promise<string | null> {
+    console.log('📝 Admin: Attempting to log signup for user:', uid, 'wallet:', walletAddress)
+
     if (!this.signer) {
-      console.error('Blockchain Logger not initialized')
+      console.error('❌ Admin: Blockchain Logger not initialized')
       return null
     }
 
     try {
       // Check if user already exists
+      console.log('🔍 Admin: Checking if user already exists...')
       const exists = await this.contract.userExists(uid)
+      console.log('🔍 Admin: User exists:', exists)
+
       if (exists) {
         throw new Error('User already signed up')
       }
-      
+
       // Estimate gas first
       let gasEstimate
       try {
         gasEstimate = await this.contract.signup.estimateGas(uid, walletAddress)
+        console.log('⛽ Admin: Gas estimate:', gasEstimate.toString())
       } catch (gasError) {
         console.warn('Gas estimation failed, using default:', gasError)
         gasEstimate = 300000n
       }
-      
+
       const tx = await this.contract.signup(uid, walletAddress, {
         gasLimit: gasEstimate + 50000n // Add buffer to gas estimate
       })
-      
+
       const receipt = await tx.wait()
-      
+
       return receipt.hash
     } catch (error: any) {
       console.error('Failed to log signup:', error)
-      
+
       // Provide more specific error messages
       if (error.message.includes('out of gas')) {
         throw new Error('Transaction failed: Insufficient gas. Please try again.')
@@ -107,37 +113,46 @@ export class BlockchainLogger {
    * Log user login activity
    */
   async logLogin(uid: string): Promise<string | null> {
+    console.log('🔐 Admin: Attempting to log login for user:', uid)
+
     if (!this.signer) {
-      console.error('Blockchain Logger not initialized')
+      console.error('❌ Admin: Blockchain Logger not initialized')
       return null
     }
 
     try {
       // First check if user exists
+      console.log('🔍 Admin: Checking if user exists...')
       const exists = await this.contract.userExists(uid)
+      console.log('🔍 Admin: User exists:', exists)
+
       if (!exists) {
         throw new Error('User must signup first before logging in')
       }
-      
+
       // Estimate gas first
       let gasEstimate
       try {
         gasEstimate = await this.contract.login.estimateGas(uid)
+        console.log('⛽ Admin: Gas estimate:', gasEstimate.toString())
       } catch (gasError) {
-        console.warn('Gas estimation failed, using default:', gasError)
+        console.warn('⚠️ Admin: Gas estimation failed, using default:', gasError)
         gasEstimate = 300000n
       }
-      
+
+      console.log('📝 Admin: Sending login transaction...')
       const tx = await this.contract.login(uid, {
         gasLimit: gasEstimate + 50000n // Add buffer to gas estimate
       })
-      
+
+      console.log('⏳ Admin: Waiting for transaction receipt...')
       const receipt = await tx.wait()
-      
+      console.log('✅ Admin: Login transaction successful:', receipt.hash)
+
       return receipt.hash
     } catch (error: any) {
       console.error('Failed to log login:', error)
-      
+
       // Provide more specific error messages
       if (error.message.includes('out of gas')) {
         throw new Error('Transaction failed: Insufficient gas. Please try again.')
@@ -155,42 +170,52 @@ export class BlockchainLogger {
    * Log user logout activity
    */
   async logLogout(uid: string): Promise<string | null> {
+    console.log('🚪 Admin: Attempting to log logout for user:', uid)
+
     if (!this.signer) {
-      console.error('Blockchain Logger not initialized')
+      console.error('❌ Admin: Blockchain Logger not initialized')
       return null
     }
 
     try {
       // Check if user exists and is logged in
+      console.log('🔍 Admin: Checking if user exists...')
       const exists = await this.contract.userExists(uid)
+      console.log('🔍 Admin: User exists:', exists)
+
       if (!exists) {
         throw new Error('User not found')
       }
-      
+
+      console.log('🔍 Admin: Checking if user is logged in...')
       const isLoggedIn = await this.contract.isUserLoggedIn(uid)
+      console.log('🔍 Admin: User is logged in:', isLoggedIn)
+
       if (!isLoggedIn) {
+        console.log('ℹ️ Admin: User is not logged in, skipping logout transaction')
         return null
       }
-      
+
       // Estimate gas first
       let gasEstimate
       try {
         gasEstimate = await this.contract.logout.estimateGas(uid)
+        console.log('⛽ Admin: Gas estimate:', gasEstimate.toString())
       } catch (gasError) {
         console.warn('Gas estimation failed, using default:', gasError)
         gasEstimate = 300000n
       }
-      
+
       const tx = await this.contract.logout(uid, {
         gasLimit: gasEstimate + 50000n // Add buffer to gas estimate
       })
-      
+
       const receipt = await tx.wait()
-      
+
       return receipt.hash
     } catch (error: any) {
       console.error('Failed to log logout:', error)
-      
+
       // Provide more specific error messages
       if (error.message.includes('out of gas')) {
         throw new Error('Transaction failed: Insufficient gas. Please try again.')
@@ -215,7 +240,7 @@ export class BlockchainLogger {
 
       // Get user details
       const details = await this.contract.fetchUserDetails(uid)
-      
+
       return {
         uid: details[0],
         walletAddress: details[1],
@@ -275,7 +300,7 @@ export class BlockchainLogger {
         transactionHash: event.transactionHash,
         date: new Date(Number(timestamp) * 1000).toLocaleString()
       }
-      
+
       if (callback) callback(eventData)
     })
 
@@ -291,7 +316,7 @@ export class BlockchainLogger {
         transactionHash: event.transactionHash,
         date: new Date(Number(timestamp) * 1000).toLocaleString()
       }
-      
+
       if (callback) callback(eventData)
     })
 
@@ -306,7 +331,7 @@ export class BlockchainLogger {
         transactionHash: event.transactionHash,
         date: new Date(Number(timestamp) * 1000).toLocaleString()
       }
-      
+
       if (callback) callback(eventData)
     })
   }
@@ -329,7 +354,7 @@ export class BlockchainLogger {
       // Get UserSignedUp events
       const signupFilter = this.contract.filters.UserSignedUp(uid)
       const signupEvents = await this.contract.queryFilter(signupFilter, fromBlock)
-      
+
       for (const event of signupEvents) {
         const eventLog = event as ethers.EventLog
         events.push({
@@ -346,7 +371,7 @@ export class BlockchainLogger {
       // Get UserLoggedIn events
       const loginFilter = this.contract.filters.UserLoggedIn(uid)
       const loginEvents = await this.contract.queryFilter(loginFilter, fromBlock)
-      
+
       for (const event of loginEvents) {
         const eventLog = event as ethers.EventLog
         events.push({
@@ -364,7 +389,7 @@ export class BlockchainLogger {
       // Get UserLoggedOut events
       const logoutFilter = this.contract.filters.UserLoggedOut(uid)
       const logoutEvents = await this.contract.queryFilter(logoutFilter, fromBlock)
-      
+
       for (const event of logoutEvents) {
         const eventLog = event as ethers.EventLog
         events.push({
@@ -402,7 +427,7 @@ export class BlockchainLogger {
       // Get all UserSignedUp events
       const signupFilter = this.contract.filters.UserSignedUp()
       const signupEvents = await this.contract.queryFilter(signupFilter, fromBlock)
-      
+
       for (const event of signupEvents) {
         const eventLog = event as ethers.EventLog
         events.push({
@@ -419,7 +444,7 @@ export class BlockchainLogger {
       // Get all UserLoggedIn events
       const loginFilter = this.contract.filters.UserLoggedIn()
       const loginEvents = await this.contract.queryFilter(loginFilter, fromBlock)
-      
+
       for (const event of loginEvents) {
         const eventLog = event as ethers.EventLog
         events.push({
@@ -437,7 +462,7 @@ export class BlockchainLogger {
       // Get all UserLoggedOut events
       const logoutFilter = this.contract.filters.UserLoggedOut()
       const logoutEvents = await this.contract.queryFilter(logoutFilter, fromBlock)
-      
+
       for (const event of logoutEvents) {
         const eventLog = event as ethers.EventLog
         events.push({
@@ -470,18 +495,18 @@ export class BlockchainLogger {
       // Test basic connection
       const network = await this.provider.getNetwork()
       const blockNumber = await this.provider.getBlockNumber()
-      
+
       // Test contract deployment
       const contractAddress = await this.contract.getAddress()
       const contractCode = await this.provider.getCode(contractAddress)
-      
+
       if (contractCode === '0x') {
         console.error('Contract not found at address:', contractAddress)
         return false
       }
-      
+
       return true
-      
+
     } catch (error: any) {
       console.error('Connection test failed:', error)
       return false

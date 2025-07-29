@@ -80,23 +80,29 @@ class AuthenticationManager {
   }
 
   async processAuthentication(userId: string, walletAddress: string): Promise<string | null> {
+    console.log('🔄 Admin Auth: Starting processAuthentication for user:', userId, 'wallet:', walletAddress)
+    
     // Prevent multiple simultaneous processing
     if (this.isProcessing) {
+      console.log('⏸️ Admin Auth: Already processing, skipping')
       return null
     }
 
     // Prevent processing the same user multiple times
     if (this.currentUserId === userId) {
+      console.log('⏸️ Admin Auth: Same user already being processed, skipping')
       return null
     }
 
     // Check if user has already been processed in this session
     if (this.isUserProcessed(userId)) {
+      console.log('⏸️ Admin Auth: User already processed in this session, skipping')
       return null
     }
 
     this.isProcessing = true
     this.currentUserId = userId
+    console.log('🔄 Admin Auth: Processing started for user:', userId)
 
     // Set a timeout to prevent stuck processing
     this.processingTimeout = setTimeout(() => {
@@ -106,6 +112,7 @@ class AuthenticationManager {
 
     try {
       if (!this.logger) {
+        console.log('🔧 Admin Auth: Initializing blockchain logger...')
         const success = await this.initializeLogger()
         if (!success) {
           throw new Error('Failed to initialize blockchain logger')
@@ -118,23 +125,32 @@ class AuthenticationManager {
       }
 
       // Check if user exists in blockchain
+      console.log('🔍 Admin Auth: Checking if user exists in blockchain...')
       const userExists = await this.logger.userExists(userId)
+      console.log('🔍 Admin Auth: User exists in blockchain:', userExists)
       
       if (!userExists) {
         // New user - create signup transaction
+        console.log('📝 Admin Auth: New user detected, calling logSignup...')
         const txHash = await this.logger.logSignup(userId, walletAddress)
+        console.log('✅ Admin Auth: Signup transaction hash:', txHash)
         this.markUserProcessed(userId)
         return txHash
       } else {
         // Check if user is already logged in on blockchain
+        console.log('🔍 Admin Auth: Existing user, checking login status...')
         const isAlreadyLoggedIn = await this.isUserLoggedInOnBlockchain(userId)
+        console.log('🔍 Admin Auth: User already logged in:', isAlreadyLoggedIn)
         
         if (isAlreadyLoggedIn) {
+          console.log('ℹ️ Admin Auth: User already logged in, no transaction needed (page refresh)')
           this.markUserProcessed(userId)
           return null
         } else {
           // User exists but not logged in - create login transaction
+          console.log('🔐 Admin Auth: User not logged in, calling logLogin...')
           const txHash = await this.logger.logLogin(userId)
+          console.log('✅ Admin Auth: Login transaction hash:', txHash)
           this.markUserProcessed(userId)
           return txHash
         }
@@ -154,29 +170,37 @@ class AuthenticationManager {
   }
 
   async processLogout(userId: string): Promise<string | null> {
+    console.log('🚪 Admin Auth: Starting processLogout for user:', userId)
+    
     if (!this.logger) {
+      console.log('❌ Admin Auth: No logger available for logout')
       return null
     }
 
     try {
       // Check if user is logged in on blockchain
+      console.log('🔍 Admin Auth: Checking if user is logged in on blockchain...')
       const isLoggedIn = await this.logger.isUserLoggedIn(userId)
+      console.log('🔍 Admin Auth: User is logged in on blockchain:', isLoggedIn)
       
       if (isLoggedIn) {
+        console.log('🚪 Admin Auth: User is logged in, calling logLogout...')
         const txHash = await this.logger.logLogout(userId)
+        console.log('✅ Admin Auth: Logout transaction hash:', txHash)
         
         // Clear user from processed list on logout
         this.processedUsers.delete(userId)
         
         return txHash
       } else {
+        console.log('ℹ️ Admin Auth: User not logged in on blockchain, no logout transaction needed')
         // Clear user from processed list even if no transaction
         this.processedUsers.delete(userId)
         
         return null
       }
     } catch (error: any) {
-      console.error('Logout failed:', error)
+      console.error('❌ Admin Auth: Logout failed:', error)
       throw error
     }
   }
