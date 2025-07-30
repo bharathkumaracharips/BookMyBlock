@@ -42,14 +42,22 @@ export interface Theater {
   screens: number
   status: 'active' | 'pending' | 'inactive' | 'rejected'
   totalSeats: number
-  ownerName: string
-  ownerEmail: string
-  ownerPhone: string
+  ownerName?: string
+  ownerEmail?: string
+  ownerPhone?: string
   createdAt: string
   updatedAt: string
   amenities?: string[]
   gstNumber?: string
   parkingSpaces?: number
+  
+  // IPFS Data
+  pdfHash?: string
+  dataHash?: string
+  ipfsUrls?: {
+    pdf: string
+    data: string
+  }
 }
 
 export interface TheaterStats {

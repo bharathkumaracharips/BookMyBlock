@@ -9,12 +9,20 @@ export function TheaterDashboard() {
   const { theaters, stats, loading, error, submitTheater } = useTheater()
 
   const handleAddTheater = async (theaterData: any): Promise<boolean> => {
-    const result = await submitTheater(theaterData)
-    if (result) {
-      setShowAddForm(false)
-      alert('Theater application submitted successfully! It will be reviewed within 2-3 business days.')
-      return true
-    } else {
+    try {
+      console.log('🎯 Submitting theater data:', theaterData)
+      const result = await submitTheater(theaterData)
+      if (result) {
+        setShowAddForm(false)
+        alert(`🎉 Theater application submitted successfully!\n\n📄 PDF Hash: ${theaterData.pdfHash}\n📊 Data Hash: ${theaterData.dataHash}\n\nYour application will be reviewed within 2-3 business days.`)
+        return true
+      } else {
+        console.error('❌ submitTheater returned null')
+        alert('Error submitting theater application. Please try again.')
+        return false
+      }
+    } catch (error) {
+      console.error('❌ Error in handleAddTheater:', error)
       alert('Error submitting theater application. Please try again.')
       return false
     }

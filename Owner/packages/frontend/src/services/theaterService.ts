@@ -18,45 +18,34 @@ class TheaterService {
 
   // Submit theater registration
   async submitTheaterApplication(data: TheaterFormData): Promise<Theater> {
-    const formData = new FormData()
+    console.log('🎯 Theater service received data:', data)
+    console.log('📄 PDF Hash:', data.pdfHash)
+    console.log('📊 Data Hash:', data.dataHash)
+    console.log('🔗 IPFS URLs:', data.ipfsUrls)
     
-    // Add text fields
-    Object.entries(data).forEach(([key, value]) => {
-      if (value && typeof value === 'string') {
-        formData.append(key, value)
-      } else if (value && typeof value === 'number') {
-        formData.append(key, value.toString())
-      } else if (Array.isArray(value)) {
-        formData.append(key, JSON.stringify(value))
-      }
-    })
+    // For now, return a mock theater object since the backend endpoint doesn't exist yet
+    // TODO: Implement actual API call to backend
+    const mockTheater: Theater = {
+      id: `theater_${Date.now()}`,
+      name: data.theaterName,
+      location: `${data.city}, ${data.state}`,
+      screens: data.numberOfScreens,
+      totalSeats: data.totalSeats,
+      status: 'pending' as const,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      // Add IPFS data to the theater record
+      pdfHash: data.pdfHash,
+      dataHash: data.dataHash,
+      ipfsUrls: data.ipfsUrls
+    }
     
-    // Add file uploads
-    const fileFields = [
-      'ownerPanCard',
-      'ownerAadharFront', 
-      'ownerAadharBack',
-      'cinemaLicense',
-      'fireNoc',
-      'buildingPermission',
-      'tradeLicense',
-      'insurancePolicy'
-    ]
+    console.log('✅ Mock theater created:', mockTheater)
     
-    fileFields.forEach(field => {
-      const files = data[field as keyof TheaterFormData] as FileList
-      if (files && files.length > 0) {
-        formData.append(field, files[0])
-      }
-    })
-
-    const response = await this.api.post('/register', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    })
+    // Simulate API delay
+    await new Promise(resolve => setTimeout(resolve, 1000))
     
-    return response.data
+    return mockTheater
   }
 
   // Get owner's theaters

@@ -18,7 +18,7 @@ import {
 } from 'lucide-react'
 import { TheaterFormData } from '../../types/theater'
 import { PDFService } from '../../services/pdfService'
-import { PinataService } from '../../services/pinataService'
+import { BackendPinataService } from '../../services/backendPinataService'
 
 // File validation helper
 const validateFile = (file: File | undefined): string | null => {
@@ -205,12 +205,27 @@ export function AddTheaterForm({ onSubmit, onCancel }: AddTheaterFormProps) {
 
     try {
       const completeData = formData as TheaterFormData
+      console.log('🚀 Starting final submission process...')
+
+      // Debug backend configuration
+      BackendPinataService.debugCredentials()
+
+      // Test IPFS connection first
+      console.log('🔍 Testing IPFS connection...')
+      const connectionTest = await BackendPinataService.testConnection()
+      if (!connectionTest) {
+        throw new Error('Failed to connect to IPFS service')
+      }
+      console.log('✅ IPFS connection successful')
 
       // Generate PDF
+      console.log('📄 Generating PDF...')
       const pdfBlob = await PDFService.generateTheaterApplicationPDF(completeData)
+      console.log('✅ PDF generated successfully, size:', pdfBlob.size, 'bytes')
 
       // Upload PDF to IPFS
-      const pdfResponse = await PinataService.uploadFile(pdfBlob, {
+      console.log('📤 Uploading PDF to IPFS...')
+      const pdfResponse = await BackendPinataService.uploadFile(pdfBlob, {
         name: `Theater Application - ${completeData.theaterName}`,
         keyvalues: {
           type: 'theater-application-pdf',
@@ -219,9 +234,13 @@ export function AddTheaterForm({ onSubmit, onCancel }: AddTheaterFormProps) {
           submissionDate: new Date().toISOString()
         }
       })
+      console.log('✅ PDF uploaded to IPFS:', pdfResponse.IpfsHash)
+
+      setIsGeneratingPDF(false)
 
       // Upload form data as JSON to IPFS
-      const dataResponse = await PinataService.uploadJSON(completeData, {
+      console.log('📤 Uploading form data to IPFS...')
+      const dataResponse = await BackendPinataService.uploadJSON(completeData, {
         name: `Theater Data - ${completeData.theaterName}`,
         keyvalues: {
           type: 'theater-application-data',
@@ -230,6 +249,7 @@ export function AddTheaterForm({ onSubmit, onCancel }: AddTheaterFormProps) {
           submissionDate: new Date().toISOString()
         }
       })
+      console.log('✅ Form data uploaded to IPFS:', dataResponse.IpfsHash)
 
       // Add IPFS hashes to the form data
       const finalData = {
@@ -237,19 +257,44 @@ export function AddTheaterForm({ onSubmit, onCancel }: AddTheaterFormProps) {
         pdfHash: pdfResponse.IpfsHash,
         dataHash: dataResponse.IpfsHash,
         ipfsUrls: {
-          pdf: PinataService.getIPFSUrl(pdfResponse.IpfsHash),
-          data: PinataService.getIPFSUrl(dataResponse.IpfsHash)
+          pdf: BackendPinataService.getIPFSUrl(pdfResponse.IpfsHash),
+          data: BackendPinataService.getIPFSUrl(dataResponse.IpfsHash)
         }
       }
 
+      console.log('🎯 Final data with IPFS hashes:', {
+        pdfHash: finalData.pdfHash,
+        dataHash: finalData.dataHash,
+        pdfUrl: finalData.ipfsUrls.pdf,
+        dataUrl: finalData.ipfsUrls.data
+      })
+
+      console.log('📨 Submitting to parent component...')
       const success = await onSubmit(finalData)
       if (!success) {
+        console.error('❌ Parent component rejected submission')
         setIsSubmitting(false)
         setIsGeneratingPDF(false)
+      } else {
+        console.log('✅ Submission completed successfully!')
+        alert(`🎉 Theater Application Submitted Successfully!\n\n📄 PDF saved to IPFS: ${finalData.pdfHash}\n📊 Data saved to IPFS: ${finalData.dataHash}\n\nYour application is now permanently stored on IPFS and ready for review.`)
       }
     } catch (error) {
-      console.error('Error in final submission:', error)
-      alert('Error submitting application. Please try again.')
+      console.error('❌ Error in final submission:', error)
+
+      // More detailed error handling
+      if (error instanceof Error) {
+        if (error.message.includes('IPFS') || error.message.includes('upload')) {
+          alert('IPFS upload failed. Please check your internet connection and try again.')
+        } else if (error.message.includes('PDF')) {
+          alert('PDF generation failed. Please try again.')
+        } else {
+          alert(`Submission failed: ${error.message}`)
+        }
+      } else {
+        alert('Error submitting application. Please try again.')
+      }
+
       setIsSubmitting(false)
       setIsGeneratingPDF(false)
     }
@@ -888,10 +933,13 @@ export function AddTheaterForm({ onSubmit, onCancel }: AddTheaterFormProps) {
             <button
               onClick={async () => {
                 try {
+                  console.log('📄 Generating PDF preview...')
                   const pdfBlob = await PDFService.generateTheaterApplicationPDF(data)
                   await PDFService.downloadPDF(pdfBlob, `theater-application-${data.theaterName}.pdf`)
+                  console.log('✅ PDF preview downloaded successfully')
                 } catch (error) {
-                  alert('Error generating PDF preview')
+                  console.error('❌ Error generating PDF preview:', error)
+                  alert('Error generating PDF preview. Please try again.')
                 }
               }}
               className="px-6 py-2 border border-violet-500 text-violet-600 rounded-lg hover:bg-violet-50 flex items-center gap-2"
@@ -904,20 +952,20 @@ export function AddTheaterForm({ onSubmit, onCancel }: AddTheaterFormProps) {
             <button
               onClick={handleFinalSubmit}
               disabled={!canFinalSubmit || isSubmitting}
-              className={`px-8 py-2 rounded-lg flex items-center gap-2 font-semibold ${canFinalSubmit && !isSubmitting
-                ? 'bg-green-600 text-white hover:bg-green-700'
+              className={`px-8 py-2 rounded-lg flex items-center gap-2 font-semibold transition-all ${canFinalSubmit && !isSubmitting
+                ? 'bg-green-600 text-white hover:bg-green-700 shadow-lg hover:shadow-xl'
                 : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                 }`}
             >
               {isSubmitting ? (
                 <>
                   <Loader2 size={16} className="animate-spin" />
-                  {isGeneratingPDF ? 'Generating PDF...' : 'Submitting...'}
+                  {isGeneratingPDF ? 'Uploading PDF to IPFS...' : 'Uploading to IPFS...'}
                 </>
               ) : (
                 <>
                   <Check size={16} />
-                  Final Submit
+                  Submit to IPFS
                 </>
               )}
             </button>

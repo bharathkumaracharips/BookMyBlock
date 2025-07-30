@@ -11,7 +11,11 @@ const PORT = process.env.PORT || 8002
 // Middleware
 app.use(helmet())
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+  origin: [
+    'http://localhost:3000',
+    'http://localhost:3002',
+    process.env.CORS_ORIGIN || 'http://localhost:3002'
+  ],
   credentials: true,
 }))
 app.use(express.json())
@@ -26,7 +30,12 @@ app.get('/health', (_req, res) => {
   })
 })
 
-// API routes placeholder
+// Import routes
+import ipfsRoutes from './routes/ipfs'
+
+// API routes
+app.use('/api/ipfs', ipfsRoutes)
+
 app.get('/api', (_req, res) => {
   res.json({ 
     message: 'BookMyBlock API v1.0.0',
@@ -35,7 +44,8 @@ app.get('/api', (_req, res) => {
       'Privy authentication integration',
       'Embedded wallet support',
       'Social login (Email, SMS, Google, Apple)',
-      'Automatic wallet creation'
+      'Automatic wallet creation',
+      'IPFS file uploads via Pinata'
     ]
   })
 })
