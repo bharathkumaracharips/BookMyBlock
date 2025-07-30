@@ -28,10 +28,8 @@ export interface TheaterFormData {
 
   // IPFS Data (added after submission)
   pdfHash?: string
-  dataHash?: string
   ipfsUrls?: {
     pdf: string
-    data: string
   }
 }
 
@@ -53,10 +51,8 @@ export interface Theater {
   
   // IPFS Data
   pdfHash?: string
-  dataHash?: string
   ipfsUrls?: {
     pdf: string
-    data: string
   }
 }
 

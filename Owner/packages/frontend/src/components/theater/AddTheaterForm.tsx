@@ -24,7 +24,7 @@ import { BackendPinataService } from '../../services/backendPinataService'
 const validateFile = (file: File | undefined): string | null => {
   if (!file) return null
 
-  const maxSize = 5 * 1024 * 1024 // 5MB
+  const maxSize = 10 * 1024 * 1024 // 10MB
   const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf']
 
   if (file.size > maxSize) {
@@ -221,7 +221,8 @@ export function AddTheaterForm({ onSubmit, onCancel }: AddTheaterFormProps) {
       // Generate PDF
       console.log('📄 Generating PDF...')
       const pdfBlob = await PDFService.generateTheaterApplicationPDF(completeData)
-      console.log('✅ PDF generated successfully, size:', pdfBlob.size, 'bytes')
+      const pdfSizeMB = (pdfBlob.size / 1024 / 1024).toFixed(2)
+      console.log('✅ PDF generated successfully, size:', pdfSizeMB, 'MB')
 
       // Upload PDF to IPFS
       console.log('📤 Uploading PDF to IPFS...')
@@ -238,35 +239,18 @@ export function AddTheaterForm({ onSubmit, onCancel }: AddTheaterFormProps) {
 
       setIsGeneratingPDF(false)
 
-      // Upload form data as JSON to IPFS
-      console.log('📤 Uploading form data to IPFS...')
-      const dataResponse = await BackendPinataService.uploadJSON(completeData, {
-        name: `Theater Data - ${completeData.theaterName}`,
-        keyvalues: {
-          type: 'theater-application-data',
-          theaterName: completeData.theaterName,
-          ownerName: completeData.ownerName,
-          submissionDate: new Date().toISOString()
-        }
-      })
-      console.log('✅ Form data uploaded to IPFS:', dataResponse.IpfsHash)
-
-      // Add IPFS hashes to the form data
+      // Add IPFS hash to the form data (only PDF, no JSON upload)
       const finalData = {
         ...completeData,
         pdfHash: pdfResponse.IpfsHash,
-        dataHash: dataResponse.IpfsHash,
         ipfsUrls: {
-          pdf: BackendPinataService.getIPFSUrl(pdfResponse.IpfsHash),
-          data: BackendPinataService.getIPFSUrl(dataResponse.IpfsHash)
+          pdf: BackendPinataService.getIPFSUrl(pdfResponse.IpfsHash)
         }
       }
 
-      console.log('🎯 Final data with IPFS hashes:', {
+      console.log('🎯 Final data with IPFS hash:', {
         pdfHash: finalData.pdfHash,
-        dataHash: finalData.dataHash,
-        pdfUrl: finalData.ipfsUrls.pdf,
-        dataUrl: finalData.ipfsUrls.data
+        pdfUrl: finalData.ipfsUrls.pdf
       })
 
       console.log('📨 Submitting to parent component...')
@@ -277,7 +261,7 @@ export function AddTheaterForm({ onSubmit, onCancel }: AddTheaterFormProps) {
         setIsGeneratingPDF(false)
       } else {
         console.log('✅ Submission completed successfully!')
-        alert(`🎉 Theater Application Submitted Successfully!\n\n📄 PDF saved to IPFS: ${finalData.pdfHash}\n📊 Data saved to IPFS: ${finalData.dataHash}\n\nYour application is now permanently stored on IPFS and ready for review.`)
+        alert(`🎉 Theater Application Submitted Successfully!\n\n📄 PDF saved to IPFS: ${finalData.pdfHash}\n🔗 View PDF: ${finalData.ipfsUrls.pdf}\n\nYour application is now permanently stored on IPFS and ready for review.`)
       }
     } catch (error) {
       console.error('❌ Error in final submission:', error)

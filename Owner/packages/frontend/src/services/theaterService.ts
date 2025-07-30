@@ -20,8 +20,7 @@ class TheaterService {
   async submitTheaterApplication(data: TheaterFormData): Promise<Theater> {
     console.log('🎯 Theater service received data:', data)
     console.log('📄 PDF Hash:', data.pdfHash)
-    console.log('📊 Data Hash:', data.dataHash)
-    console.log('🔗 IPFS URLs:', data.ipfsUrls)
+    console.log('🔗 IPFS URL:', data.ipfsUrls)
     
     // For now, return a mock theater object since the backend endpoint doesn't exist yet
     // TODO: Implement actual API call to backend
@@ -36,7 +35,6 @@ class TheaterService {
       updatedAt: new Date().toISOString(),
       // Add IPFS data to the theater record
       pdfHash: data.pdfHash,
-      dataHash: data.dataHash,
       ipfsUrls: data.ipfsUrls
     }
     

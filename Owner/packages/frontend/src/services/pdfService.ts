@@ -1,23 +1,199 @@
+import jsPDF from 'jspdf'
 import { TheaterFormData } from '../types/theater'
 
 export class PDFService {
     static async generateTheaterApplicationPDF(data: TheaterFormData): Promise<Blob> {
         try {
-            // Create a text-based document that can be properly downloaded
-            const textContent = this.createTextContent(data)
-            
-            // Create a proper text file that can be downloaded
-            return new Blob([textContent], { 
-                type: 'text/plain;charset=utf-8' 
-            })
+            console.log('📄 Generating PDF with images...')
+            const pdf = new jsPDF()
+            let yPosition = 20
+
+            // Helper function to add text
+            const addText = (text: string, x: number = 20, fontSize: number = 12, isBold: boolean = false) => {
+                pdf.setFontSize(fontSize)
+                if (isBold) {
+                    pdf.setFont('helvetica', 'bold')
+                } else {
+                    pdf.setFont('helvetica', 'normal')
+                }
+                pdf.text(text, x, yPosition)
+                yPosition += fontSize * 0.5 + 5
+            }
+
+            // Helper function to add image from FileList
+            const addImageFromFile = async (fileList: FileList | undefined, label: string): Promise<void> => {
+                if (!fileList || fileList.length === 0) {
+                    addText(`${label}: Not provided`)
+                    return
+                }
+
+                const file = fileList[0]
+                if (!file.type.startsWith('image/')) {
+                    addText(`${label}: ${file.name} (Non-image file)`)
+                    return
+                }
+
+                try {
+                    // Compress and resize image before adding to PDF
+                    const compressedImageDataUrl = await this.compressImage(file, 400, 300, 0.7)
+                    const imgWidth = 50  // Reduced size
+                    const imgHeight = 35 // Reduced size
+
+                    // Check if we need a new page
+                    if (yPosition + imgHeight > 280) {
+                        pdf.addPage()
+                        yPosition = 20
+                    }
+
+                    addText(`${label}:`, 20, 12, true)
+                    pdf.addImage(compressedImageDataUrl, 'JPEG', 20, yPosition, imgWidth, imgHeight)
+                    yPosition += imgHeight + 10
+                } catch (error) {
+                    console.error(`Error adding image for ${label}:`, error)
+                    addText(`${label}: ${file.name} (Error loading image)`)
+                }
+            }
+
+            // Title
+            addText('THEATER REGISTRATION APPLICATION', 20, 18, true)
+            addText(`Generated on: ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}`, 20, 10)
+            yPosition += 10
+
+            // Owner Details Section
+            addText('OWNER DETAILS', 20, 16, true)
+            addText(`Full Name: ${data.ownerName}`)
+            addText(`Email: ${data.ownerEmail}`)
+            addText(`Phone: ${data.ownerPhone}`)
+            yPosition += 5
+
+            // Owner Documents
+            addText('Identity Documents:', 20, 14, true)
+            await addImageFromFile(data.ownerPanCard, 'PAN Card')
+            await addImageFromFile(data.ownerAadharFront, 'Aadhar Card (Front)')
+            await addImageFromFile(data.ownerAadharBack, 'Aadhar Card (Back)')
+
+            // Check if we need a new page
+            if (yPosition > 200) {
+                pdf.addPage()
+                yPosition = 20
+            }
+
+            // Theater Details Section
+            addText('THEATER DETAILS', 20, 16, true)
+            addText(`Theater Name: ${data.theaterName}`)
+            addText(`Address: ${data.address}`)
+            addText(`City: ${data.city}`)
+            addText(`State: ${data.state}`)
+            addText(`Pincode: ${data.pincode}`)
+            addText(`Number of Screens: ${data.numberOfScreens}`)
+            addText(`Total Seats: ${data.totalSeats}`)
+            addText(`Parking Spaces: ${data.parkingSpaces}`)
+            addText(`Amenities: ${data.amenities?.join(', ') || 'None'}`)
+            yPosition += 5
+
+            // Legal Documents Section
+            addText('LEGAL DOCUMENTS', 20, 16, true)
+            addText(`GST Number: ${data.gstNumber}`)
+            yPosition += 5
+
+            addText('Required Documents:', 20, 14, true)
+            await addImageFromFile(data.cinemaLicense, 'Cinema License')
+            await addImageFromFile(data.fireNoc, 'Fire NOC Certificate')
+            await addImageFromFile(data.buildingPermission, 'Building Permission')
+
+            if (data.tradeLicense && data.tradeLicense.length > 0) {
+                await addImageFromFile(data.tradeLicense, 'Trade License')
+            }
+            if (data.insurancePolicy && data.insurancePolicy.length > 0) {
+                await addImageFromFile(data.insurancePolicy, 'Insurance Policy')
+            }
+
+            // Footer
+            if (yPosition > 250) {
+                pdf.addPage()
+                yPosition = 20
+            }
+            yPosition += 10
+            addText(`Application ID: ${Date.now()}`)
+            addText('This is a system-generated document for theater registration application.', 20, 10)
+            addText('BookMyBlock Platform - Theater Owner Dashboard', 20, 10)
+
+            console.log('✅ PDF generated successfully with compressed images')
+
+            // Generate PDF with compression
+            const pdfBlob = pdf.output('blob')
+            console.log('📊 PDF size:', (pdfBlob.size / 1024 / 1024).toFixed(2), 'MB')
+
+            return pdfBlob
         } catch (error) {
             console.error('Error generating PDF:', error)
-            // Fallback content
-            const fallbackContent = `Theater Registration Application\n\nError generating full document.\nPlease contact support.`
-            return new Blob([fallbackContent], { 
-                type: 'text/plain;charset=utf-8' 
-            })
+            // Fallback to text-based PDF
+            return this.generateFallbackPDF(data)
         }
+    }
+
+    // Helper function to convert File to DataURL
+    private static fileToDataURL(file: File): Promise<string> {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader()
+            reader.onload = (e) => resolve(e.target?.result as string)
+            reader.onerror = reject
+            reader.readAsDataURL(file)
+        })
+    }
+
+    // Helper function to compress and resize images
+    private static compressImage(file: File, maxWidth: number, maxHeight: number, quality: number): Promise<string> {
+        return new Promise((resolve, reject) => {
+            const canvas = document.createElement('canvas')
+            const ctx = canvas.getContext('2d')
+            const img = new Image()
+
+            img.onload = () => {
+                // Calculate new dimensions while maintaining aspect ratio
+                let { width, height } = img
+
+                if (width > height) {
+                    if (width > maxWidth) {
+                        height = (height * maxWidth) / width
+                        width = maxWidth
+                    }
+                } else {
+                    if (height > maxHeight) {
+                        width = (width * maxHeight) / height
+                        height = maxHeight
+                    }
+                }
+
+                canvas.width = width
+                canvas.height = height
+
+                // Draw and compress the image
+                ctx?.drawImage(img, 0, 0, width, height)
+
+                // Convert to compressed JPEG
+                const compressedDataUrl = canvas.toDataURL('image/jpeg', quality)
+                resolve(compressedDataUrl)
+            }
+
+            img.onerror = reject
+
+            // Convert file to data URL first
+            const reader = new FileReader()
+            reader.onload = (e) => {
+                img.src = e.target?.result as string
+            }
+            reader.onerror = reject
+            reader.readAsDataURL(file)
+        })
+    }
+
+    // Fallback text-based PDF
+    private static generateFallbackPDF(data: TheaterFormData): Blob {
+        const textContent = this.createTextContent(data)
+        return new Blob([textContent], {
+            type: 'text/plain;charset=utf-8'
+        })
     }
 
     private static createHTMLContent(data: TheaterFormData): string {
@@ -184,9 +360,8 @@ BookMyBlock Platform - Theater Owner Dashboard
             const url = URL.createObjectURL(blob)
             const link = document.createElement('a')
             link.href = url
-            // Change extension to .txt since we're generating text files
-            const textFilename = filename.replace('.pdf', '.txt')
-            link.download = textFilename
+            // Keep .pdf extension for proper PDF files
+            link.download = filename.endsWith('.pdf') ? filename : filename + '.pdf'
             link.style.display = 'none'
             document.body.appendChild(link)
             link.click()

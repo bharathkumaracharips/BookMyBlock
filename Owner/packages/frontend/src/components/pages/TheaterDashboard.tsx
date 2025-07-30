@@ -14,7 +14,7 @@ export function TheaterDashboard() {
       const result = await submitTheater(theaterData)
       if (result) {
         setShowAddForm(false)
-        alert(`🎉 Theater application submitted successfully!\n\n📄 PDF Hash: ${theaterData.pdfHash}\n📊 Data Hash: ${theaterData.dataHash}\n\nYour application will be reviewed within 2-3 business days.`)
+        alert(`🎉 Theater application submitted successfully!\n\n📄 PDF Hash: ${theaterData.pdfHash}\n�  View PDF: ${theaterData.ipfsUrls?.pdf}\n\nYour application will be reviewed within 2-3 business days.`)
         return true
       } else {
         console.error('❌ submitTheater returned null')
