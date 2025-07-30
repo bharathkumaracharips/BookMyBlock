@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -11,9 +11,14 @@ import {
   ChevronRight,
   Check,
   AlertCircle,
-  Loader2
+  Loader2,
+  Eye,
+  Download,
+  Clock
 } from 'lucide-react'
 import { TheaterFormData } from '../../types/theater'
+import { PDFService } from '../../services/pdfService'
+import { PinataService } from '../../services/pinataService'
 
 // File validation helper
 const validateFile = (file: File | undefined): string | null => {
@@ -140,6 +145,10 @@ export function AddTheaterForm({ onSubmit, onCancel }: AddTheaterFormProps) {
   const [completedSteps, setCompletedSteps] = useState<number[]>([])
   const [formData, setFormData] = useState<Partial<TheaterFormData>>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [showPreview, setShowPreview] = useState(false)
+  const [previewTimer, setPreviewTimer] = useState(60)
+  const [canFinalSubmit, setCanFinalSubmit] = useState(false)
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false)
 
   // Form instances for each step
   const ownerForm = useForm<OwnerDetailsForm>({
@@ -157,6 +166,23 @@ export function AddTheaterForm({ onSubmit, onCancel }: AddTheaterFormProps) {
     mode: 'onChange'
   })
 
+  // Timer effect for preview
+  useEffect(() => {
+    let interval: NodeJS.Timeout
+    if (showPreview && previewTimer > 0) {
+      interval = setInterval(() => {
+        setPreviewTimer(prev => {
+          if (prev <= 1) {
+            setCanFinalSubmit(true)
+            return 0
+          }
+          return prev - 1
+        })
+      }, 1000)
+    }
+    return () => clearInterval(interval)
+  }, [showPreview, previewTimer])
+
   const handleStepSubmit = async (step: number, data: any) => {
     setFormData(prev => ({ ...prev, ...data }))
     setCompletedSteps(prev => [...prev.filter(s => s !== step), step])
@@ -164,17 +190,68 @@ export function AddTheaterForm({ onSubmit, onCancel }: AddTheaterFormProps) {
     if (step < 3) {
       setCurrentStep(step + 1)
     } else {
-      // Final submission
-      setIsSubmitting(true)
-      try {
-        const completeData = { ...formData, ...data } as TheaterFormData
-        const success = await onSubmit(completeData)
-        if (!success) {
-          setIsSubmitting(false)
+      // Show preview instead of immediate submission
+      const completeData = { ...formData, ...data } as TheaterFormData
+      setFormData(completeData)
+      setShowPreview(true)
+      setPreviewTimer(60)
+      setCanFinalSubmit(false)
+    }
+  }
+
+  const handleFinalSubmit = async () => {
+    setIsSubmitting(true)
+    setIsGeneratingPDF(true)
+
+    try {
+      const completeData = formData as TheaterFormData
+
+      // Generate PDF
+      const pdfBlob = await PDFService.generateTheaterApplicationPDF(completeData)
+
+      // Upload PDF to IPFS
+      const pdfResponse = await PinataService.uploadFile(pdfBlob, {
+        name: `Theater Application - ${completeData.theaterName}`,
+        keyvalues: {
+          type: 'theater-application-pdf',
+          theaterName: completeData.theaterName,
+          ownerName: completeData.ownerName,
+          submissionDate: new Date().toISOString()
         }
-      } catch (error) {
-        setIsSubmitting(false)
+      })
+
+      // Upload form data as JSON to IPFS
+      const dataResponse = await PinataService.uploadJSON(completeData, {
+        name: `Theater Data - ${completeData.theaterName}`,
+        keyvalues: {
+          type: 'theater-application-data',
+          theaterName: completeData.theaterName,
+          ownerName: completeData.ownerName,
+          submissionDate: new Date().toISOString()
+        }
+      })
+
+      // Add IPFS hashes to the form data
+      const finalData = {
+        ...completeData,
+        pdfHash: pdfResponse.IpfsHash,
+        dataHash: dataResponse.IpfsHash,
+        ipfsUrls: {
+          pdf: PinataService.getIPFSUrl(pdfResponse.IpfsHash),
+          data: PinataService.getIPFSUrl(dataResponse.IpfsHash)
+        }
       }
+
+      const success = await onSubmit(finalData)
+      if (!success) {
+        setIsSubmitting(false)
+        setIsGeneratingPDF(false)
+      }
+    } catch (error) {
+      console.error('Error in final submission:', error)
+      alert('Error submitting application. Please try again.')
+      setIsSubmitting(false)
+      setIsGeneratingPDF(false)
     }
   }
 
@@ -269,6 +346,7 @@ export function AddTheaterForm({ onSubmit, onCancel }: AddTheaterFormProps) {
       </div>
     )
   }
+
   const renderStep1 = () => {
     const watchedFiles = ownerForm.watch(['ownerPanCard', 'ownerAadharFront', 'ownerAadharBack'])
 
@@ -383,286 +461,475 @@ export function AddTheaterForm({ onSubmit, onCancel }: AddTheaterFormProps) {
     )
   }
 
-  const renderStep2 = () => (
-    <form onSubmit={theaterForm.handleSubmit((data) => handleStepSubmit(2, data))} className="space-y-6">
-      <div className="text-center mb-6">
-        <Building2 className="mx-auto h-12 w-12 text-violet-500 mb-2" />
-        <h3 className="text-xl font-semibold text-gray-900">Theater Details</h3>
-        <p className="text-gray-600">Provide comprehensive information about your theater</p>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="md:col-span-2">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Theater Name <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="text"
-            {...theaterForm.register('theaterName')}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-violet-500 focus:border-transparent"
-            placeholder="Enter theater name"
-          />
-          {theaterForm.formState.errors.theaterName && (
-            <p className="text-red-500 text-sm mt-1">{theaterForm.formState.errors.theaterName.message}</p>
-          )}
-        </div>
-
-        <div className="md:col-span-2">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Complete Address <span className="text-red-500">*</span>
-          </label>
-          <textarea
-            {...theaterForm.register('address')}
-            rows={3}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-violet-500 focus:border-transparent"
-            placeholder="Enter complete address with landmarks"
-          />
-          {theaterForm.formState.errors.address && (
-            <p className="text-red-500 text-sm mt-1">{theaterForm.formState.errors.address.message}</p>
-          )}
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            City <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="text"
-            {...theaterForm.register('city')}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-violet-500 focus:border-transparent"
-            placeholder="Enter city"
-          />
-          {theaterForm.formState.errors.city && (
-            <p className="text-red-500 text-sm mt-1">{theaterForm.formState.errors.city.message}</p>
-          )}
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            State <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="text"
-            {...theaterForm.register('state')}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-violet-500 focus:border-transparent"
-            placeholder="Enter state"
-          />
-          {theaterForm.formState.errors.state && (
-            <p className="text-red-500 text-sm mt-1">{theaterForm.formState.errors.state.message}</p>
-          )}
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Pincode <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="text"
-            {...theaterForm.register('pincode')}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-violet-500 focus:border-transparent"
-            placeholder="123456"
-          />
-          {theaterForm.formState.errors.pincode && (
-            <p className="text-red-500 text-sm mt-1">{theaterForm.formState.errors.pincode.message}</p>
-          )}
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Number of Screens <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="number"
-            min="1"
-            max="20"
-            {...theaterForm.register('numberOfScreens', { valueAsNumber: true })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-violet-500 focus:border-transparent"
-            placeholder="1"
-          />
-          {theaterForm.formState.errors.numberOfScreens && (
-            <p className="text-red-500 text-sm mt-1">{theaterForm.formState.errors.numberOfScreens.message}</p>
-          )}
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Total Seats <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="number"
-            min="50"
-            max="5000"
-            {...theaterForm.register('totalSeats', { valueAsNumber: true })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-violet-500 focus:border-transparent"
-            placeholder="200"
-          />
-          {theaterForm.formState.errors.totalSeats && (
-            <p className="text-red-500 text-sm mt-1">{theaterForm.formState.errors.totalSeats.message}</p>
-          )}
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Parking Spaces
-          </label>
-          <input
-            type="number"
-            min="0"
-            max="1000"
-            {...theaterForm.register('parkingSpaces', { valueAsNumber: true })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-violet-500 focus:border-transparent"
-            placeholder="50"
-          />
-          {theaterForm.formState.errors.parkingSpaces && (
-            <p className="text-red-500 text-sm mt-1">{theaterForm.formState.errors.parkingSpaces.message}</p>
-          )}
-        </div>
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-3">
-          Amenities & Features
-        </label>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-          {AMENITIES_OPTIONS.map((amenity) => (
-            <label key={amenity} className="flex items-center space-x-2 cursor-pointer">
-              <input
-                type="checkbox"
-                value={amenity}
-                {...theaterForm.register('amenities')}
-                className="rounded border-gray-300 text-violet-600 focus:ring-violet-500"
-              />
-              <span className="text-sm text-gray-700">{amenity}</span>
-            </label>
-          ))}
-        </div>
-      </div>
-
-      <div className="flex justify-between pt-6">
-        <button
-          type="button"
-          onClick={() => setCurrentStep(1)}
-          className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-          disabled={isSubmitting}
-        >
-          <ChevronLeft size={16} /> Previous
-        </button>
-        <button
-          type="submit"
-          className="px-6 py-2 bg-violet-500 text-white rounded-lg hover:bg-violet-600 flex items-center gap-2 disabled:opacity-50"
-          disabled={isSubmitting}
-        >
-          Next Step <ChevronRight size={16} />
-        </button>
-      </div>
-    </form>
-  )
-  const renderStep3 = () => (
-    <form onSubmit={legalForm.handleSubmit((data) => handleStepSubmit(3, data))} className="space-y-6">
-      <div className="text-center mb-6">
-        <FileText className="mx-auto h-12 w-12 text-violet-500 mb-2" />
-        <h3 className="text-xl font-semibold text-gray-900">Legal Documents</h3>
-        <p className="text-gray-600">Upload required legal documents and licenses</p>
-      </div>
-
-      <div className="space-y-6">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            GST Number <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="text"
-            {...legalForm.register('gstNumber')}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-violet-500 focus:border-transparent uppercase"
-            placeholder="22AAAAA0000A1Z5"
-            onChange={(e) => {
-              e.target.value = e.target.value.toUpperCase()
-            }}
-          />
-          {legalForm.formState.errors.gstNumber && (
-            <p className="text-red-500 text-sm mt-1">{legalForm.formState.errors.gstNumber.message}</p>
-          )}
+  const renderStep2 = () => {
+    return (
+      <form onSubmit={theaterForm.handleSubmit((data) => handleStepSubmit(2, data))} className="space-y-6">
+        <div className="text-center mb-6">
+          <Building2 className="mx-auto h-12 w-12 text-violet-500 mb-2" />
+          <h3 className="text-xl font-semibold text-gray-900">Theater Details</h3>
+          <p className="text-gray-600">Provide comprehensive information about your theater</p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {renderFileUpload(
-            'cinemaLicense',
-            'Cinema Operator License',
-            legalForm.register('cinemaLicense'),
-            legalForm.formState.errors.cinemaLicense?.message
-          )}
-          {renderFileUpload(
-            'fireNoc',
-            'Fire NOC Certificate',
-            legalForm.register('fireNoc'),
-            legalForm.formState.errors.fireNoc?.message
-          )}
-          {renderFileUpload(
-            'buildingPermission',
-            'Building Permission',
-            legalForm.register('buildingPermission'),
-            legalForm.formState.errors.buildingPermission?.message
-          )}
-          {renderFileUpload(
-            'tradeLicense',
-            'Trade License (Optional)',
-            legalForm.register('tradeLicense'),
-            legalForm.formState.errors.tradeLicense?.message
-          )}
-          {renderFileUpload(
-            'insurancePolicy',
-            'Insurance Policy (Optional)',
-            legalForm.register('insurancePolicy'),
-            legalForm.formState.errors.insurancePolicy?.message
-          )}
-        </div>
-      </div>
+          <div className="md:col-span-2">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Theater Name <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              {...theaterForm.register('theaterName')}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-violet-500 focus:border-transparent"
+              placeholder="Enter theater name"
+            />
+            {theaterForm.formState.errors.theaterName && (
+              <p className="text-red-500 text-sm mt-1">{theaterForm.formState.errors.theaterName.message}</p>
+            )}
+          </div>
 
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <div className="flex items-start">
-          <AlertCircle className="h-5 w-5 text-blue-500 mt-0.5 mr-3 flex-shrink-0" />
+          <div className="md:col-span-2">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Complete Address <span className="text-red-500">*</span>
+            </label>
+            <textarea
+              {...theaterForm.register('address')}
+              rows={3}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-violet-500 focus:border-transparent"
+              placeholder="Enter complete address with landmarks"
+            />
+            {theaterForm.formState.errors.address && (
+              <p className="text-red-500 text-sm mt-1">{theaterForm.formState.errors.address.message}</p>
+            )}
+          </div>
+
           <div>
-            <h4 className="text-sm font-medium text-blue-800">Important Notes</h4>
-            <ul className="mt-2 text-sm text-blue-700 list-disc list-inside space-y-1">
-              <li>All documents should be clear and readable</li>
-              <li>File size should not exceed 5MB per document</li>
-              <li>Accepted formats: PDF, JPG, JPEG, PNG</li>
-              <li>Documents will be verified before theater approval</li>
-              <li>Processing time: 2-3 business days after submission</li>
-            </ul>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              City <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              {...theaterForm.register('city')}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-violet-500 focus:border-transparent"
+              placeholder="Enter city"
+            />
+            {theaterForm.formState.errors.city && (
+              <p className="text-red-500 text-sm mt-1">{theaterForm.formState.errors.city.message}</p>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              State <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              {...theaterForm.register('state')}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-violet-500 focus:border-transparent"
+              placeholder="Enter state"
+            />
+            {theaterForm.formState.errors.state && (
+              <p className="text-red-500 text-sm mt-1">{theaterForm.formState.errors.state.message}</p>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Pincode <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              {...theaterForm.register('pincode')}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-violet-500 focus:border-transparent"
+              placeholder="123456"
+            />
+            {theaterForm.formState.errors.pincode && (
+              <p className="text-red-500 text-sm mt-1">{theaterForm.formState.errors.pincode.message}</p>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Number of Screens <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="number"
+              min="1"
+              max="20"
+              {...theaterForm.register('numberOfScreens', { valueAsNumber: true })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-violet-500 focus:border-transparent"
+              placeholder="1"
+            />
+            {theaterForm.formState.errors.numberOfScreens && (
+              <p className="text-red-500 text-sm mt-1">{theaterForm.formState.errors.numberOfScreens.message}</p>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Total Seats <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="number"
+              min="50"
+              max="5000"
+              {...theaterForm.register('totalSeats', { valueAsNumber: true })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-violet-500 focus:border-transparent"
+              placeholder="200"
+            />
+            {theaterForm.formState.errors.totalSeats && (
+              <p className="text-red-500 text-sm mt-1">{theaterForm.formState.errors.totalSeats.message}</p>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Parking Spaces
+            </label>
+            <input
+              type="number"
+              min="0"
+              max="1000"
+              {...theaterForm.register('parkingSpaces', { valueAsNumber: true })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-violet-500 focus:border-transparent"
+              placeholder="50"
+            />
+            {theaterForm.formState.errors.parkingSpaces && (
+              <p className="text-red-500 text-sm mt-1">{theaterForm.formState.errors.parkingSpaces.message}</p>
+            )}
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-3">
+            Amenities & Features
+          </label>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            {AMENITIES_OPTIONS.map((amenity) => (
+              <label key={amenity} className="flex items-center space-x-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  value={amenity}
+                  {...theaterForm.register('amenities')}
+                  className="rounded border-gray-300 text-violet-600 focus:ring-violet-500"
+                />
+                <span className="text-sm text-gray-700">{amenity}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex justify-between pt-6">
+          <button
+            type="button"
+            onClick={() => setCurrentStep(1)}
+            className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+            disabled={isSubmitting}
+          >
+            <ChevronLeft size={16} /> Previous
+          </button>
+          <button
+            type="submit"
+            className="px-6 py-2 bg-violet-500 text-white rounded-lg hover:bg-violet-600 flex items-center gap-2 disabled:opacity-50"
+            disabled={isSubmitting}
+          >
+            Next Step <ChevronRight size={16} />
+          </button>
+        </div>
+      </form>
+    )
+  }
+
+  const renderStep3 = () => {
+    const watchedLegalFiles = legalForm.watch(['cinemaLicense', 'fireNoc', 'buildingPermission', 'tradeLicense', 'insurancePolicy'])
+
+    return (
+      <form onSubmit={legalForm.handleSubmit((data) => handleStepSubmit(3, data))} className="space-y-6">
+        <div className="text-center mb-6">
+          <FileText className="mx-auto h-12 w-12 text-violet-500 mb-2" />
+          <h3 className="text-xl font-semibold text-gray-900">Legal Documents</h3>
+          <p className="text-gray-600">Upload required legal documents and licenses</p>
+        </div>
+
+        <div className="space-y-6">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              GST Number <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              {...legalForm.register('gstNumber')}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-violet-500 focus:border-transparent uppercase"
+              placeholder="22AAAAA0000A1Z5"
+              onChange={(e) => {
+                e.target.value = e.target.value.toUpperCase()
+              }}
+            />
+            {legalForm.formState.errors.gstNumber && (
+              <p className="text-red-500 text-sm mt-1">{legalForm.formState.errors.gstNumber.message}</p>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {renderFileUpload(
+              'cinemaLicense',
+              'Cinema Operator License',
+              legalForm.register('cinemaLicense'),
+              legalForm.formState.errors.cinemaLicense?.message,
+              "image/*,.pdf",
+              watchedLegalFiles[0]
+            )}
+            {renderFileUpload(
+              'fireNoc',
+              'Fire NOC Certificate',
+              legalForm.register('fireNoc'),
+              legalForm.formState.errors.fireNoc?.message,
+              "image/*,.pdf",
+              watchedLegalFiles[1]
+            )}
+            {renderFileUpload(
+              'buildingPermission',
+              'Building Permission',
+              legalForm.register('buildingPermission'),
+              legalForm.formState.errors.buildingPermission?.message,
+              "image/*,.pdf",
+              watchedLegalFiles[2]
+            )}
+            {renderFileUpload(
+              'tradeLicense',
+              'Trade License (Optional)',
+              legalForm.register('tradeLicense'),
+              legalForm.formState.errors.tradeLicense?.message,
+              "image/*,.pdf",
+              watchedLegalFiles[3]
+            )}
+            {renderFileUpload(
+              'insurancePolicy',
+              'Insurance Policy (Optional)',
+              legalForm.register('insurancePolicy'),
+              legalForm.formState.errors.insurancePolicy?.message,
+              "image/*,.pdf",
+              watchedLegalFiles[4]
+            )}
+          </div>
+        </div>
+
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="flex items-start">
+            <AlertCircle className="h-5 w-5 text-blue-500 mt-0.5 mr-3 flex-shrink-0" />
+            <div>
+              <h4 className="text-sm font-medium text-blue-800">Important Notes</h4>
+              <ul className="mt-2 text-sm text-blue-700 list-disc list-inside space-y-1">
+                <li>All documents should be clear and readable</li>
+                <li>File size should not exceed 5MB per document</li>
+                <li>Accepted formats: PDF, JPG, JPEG, PNG</li>
+                <li>Documents will be verified before theater approval</li>
+                <li>Processing time: 2-3 business days after submission</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex justify-between pt-6">
+          <button
+            type="button"
+            onClick={() => setCurrentStep(2)}
+            className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+            disabled={isSubmitting}
+          >
+            <ChevronLeft size={16} /> Previous
+          </button>
+          <button
+            type="submit"
+            className="px-8 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2 disabled:opacity-50"
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? (
+              <>
+                <Loader2 size={16} className="animate-spin" />
+                Submitting...
+              </>
+            ) : (
+              <>
+                <Check size={16} />
+                Submit Application
+              </>
+            )}
+          </button>
+        </div>
+      </form>
+    )
+  }
+
+  const renderPreview = () => {
+    const data = formData as TheaterFormData
+
+    return (
+      <div className="max-w-4xl mx-auto p-6 bg-white rounded-xl shadow-lg">
+        <div className="mb-8 text-center">
+          <Eye className="mx-auto h-12 w-12 text-violet-500 mb-4" />
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Application Preview</h2>
+          <p className="text-gray-600">Please review your application details carefully</p>
+
+          {/* Timer */}
+          <div className="mt-4 flex items-center justify-center gap-2">
+            <Clock className="h-5 w-5 text-orange-500" />
+            <span className="text-lg font-semibold text-orange-600">
+              {previewTimer > 0 ? `${previewTimer}s remaining` : 'Review complete'}
+            </span>
+          </div>
+        </div>
+
+        <div className="space-y-8">
+          {/* Owner Details */}
+          <div className="bg-gray-50 p-6 rounded-lg">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              <User className="h-5 w-5" />
+              Owner Details
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <span className="text-sm font-medium text-gray-600">Full Name</span>
+                <p className="text-gray-900">{data.ownerName}</p>
+              </div>
+              <div>
+                <span className="text-sm font-medium text-gray-600">Email</span>
+                <p className="text-gray-900">{data.ownerEmail}</p>
+              </div>
+              <div>
+                <span className="text-sm font-medium text-gray-600">Phone</span>
+                <p className="text-gray-900">{data.ownerPhone}</p>
+              </div>
+            </div>
+
+            <div className="mt-4">
+              <span className="text-sm font-medium text-gray-600">Documents</span>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mt-2">
+                <div className="text-sm text-gray-700">✓ PAN Card: {data.ownerPanCard?.[0]?.name}</div>
+                <div className="text-sm text-gray-700">✓ Aadhar Front: {data.ownerAadharFront?.[0]?.name}</div>
+                <div className="text-sm text-gray-700">✓ Aadhar Back: {data.ownerAadharBack?.[0]?.name}</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Theater Details */}
+          <div className="bg-gray-50 p-6 rounded-lg">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              <Building2 className="h-5 w-5" />
+              Theater Details
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <span className="text-sm font-medium text-gray-600">Theater Name</span>
+                <p className="text-gray-900">{data.theaterName}</p>
+              </div>
+              <div>
+                <span className="text-sm font-medium text-gray-600">Location</span>
+                <p className="text-gray-900">{data.city}, {data.state} - {data.pincode}</p>
+              </div>
+              <div>
+                <span className="text-sm font-medium text-gray-600">Screens</span>
+                <p className="text-gray-900">{data.numberOfScreens}</p>
+              </div>
+              <div>
+                <span className="text-sm font-medium text-gray-600">Total Seats</span>
+                <p className="text-gray-900">{data.totalSeats}</p>
+              </div>
+              <div>
+                <span className="text-sm font-medium text-gray-600">Parking Spaces</span>
+                <p className="text-gray-900">{data.parkingSpaces}</p>
+              </div>
+              <div>
+                <span className="text-sm font-medium text-gray-600">Amenities</span>
+                <p className="text-gray-900">{data.amenities?.join(', ') || 'None'}</p>
+              </div>
+            </div>
+            <div className="mt-4">
+              <span className="text-sm font-medium text-gray-600">Address</span>
+              <p className="text-gray-900">{data.address}</p>
+            </div>
+          </div>
+
+          {/* Legal Details */}
+          <div className="bg-gray-50 p-6 rounded-lg">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              Legal Documents
+            </h3>
+            <div className="mb-4">
+              <span className="text-sm font-medium text-gray-600">GST Number</span>
+              <p className="text-gray-900">{data.gstNumber}</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              <div className="text-sm text-gray-700">✓ Cinema License: {data.cinemaLicense?.[0]?.name}</div>
+              <div className="text-sm text-gray-700">✓ Fire NOC: {data.fireNoc?.[0]?.name}</div>
+              <div className="text-sm text-gray-700">✓ Building Permission: {data.buildingPermission?.[0]?.name}</div>
+              {data.tradeLicense?.[0] && (
+                <div className="text-sm text-gray-700">✓ Trade License: {data.tradeLicense[0].name}</div>
+              )}
+              {data.insurancePolicy?.[0] && (
+                <div className="text-sm text-gray-700">✓ Insurance Policy: {data.insurancePolicy[0].name}</div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex justify-between items-center pt-8 border-t">
+          <button
+            onClick={() => setShowPreview(false)}
+            className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+            disabled={isSubmitting}
+          >
+            <ChevronLeft size={16} />
+            Back to Edit
+          </button>
+
+          <div className="flex gap-4">
+            <button
+              onClick={async () => {
+                try {
+                  const pdfBlob = await PDFService.generateTheaterApplicationPDF(data)
+                  await PDFService.downloadPDF(pdfBlob, `theater-application-${data.theaterName}.pdf`)
+                } catch (error) {
+                  alert('Error generating PDF preview')
+                }
+              }}
+              className="px-6 py-2 border border-violet-500 text-violet-600 rounded-lg hover:bg-violet-50 flex items-center gap-2"
+              disabled={isSubmitting}
+            >
+              <Download size={16} />
+              Download Preview
+            </button>
+
+            <button
+              onClick={handleFinalSubmit}
+              disabled={!canFinalSubmit || isSubmitting}
+              className={`px-8 py-2 rounded-lg flex items-center gap-2 font-semibold ${canFinalSubmit && !isSubmitting
+                ? 'bg-green-600 text-white hover:bg-green-700'
+                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                }`}
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  {isGeneratingPDF ? 'Generating PDF...' : 'Submitting...'}
+                </>
+              ) : (
+                <>
+                  <Check size={16} />
+                  Final Submit
+                </>
+              )}
+            </button>
           </div>
         </div>
       </div>
+    )
+  }
 
-      <div className="flex justify-between pt-6">
-        <button
-          type="button"
-          onClick={() => setCurrentStep(2)}
-          className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-          disabled={isSubmitting}
-        >
-          <ChevronLeft size={16} /> Previous
-        </button>
-        <button
-          type="submit"
-          className="px-8 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2 disabled:opacity-50"
-          disabled={isSubmitting}
-        >
-          {isSubmitting ? (
-            <>
-              <Loader2 size={16} className="animate-spin" />
-              Submitting...
-            </>
-          ) : (
-            <>
-              <Check size={16} />
-              Submit Application
-            </>
-          )}
-        </button>
-      </div>
-    </form>
-  )
+  if (showPreview) {
+    return renderPreview()
+  }
 
   return (
     <div className="max-w-4xl mx-auto p-6 bg-white rounded-xl shadow-lg">

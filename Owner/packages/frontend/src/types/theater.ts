@@ -25,6 +25,14 @@ export interface TheaterFormData {
   buildingPermission: FileList
   tradeLicense?: FileList
   insurancePolicy?: FileList
+
+  // IPFS Data (added after submission)
+  pdfHash?: string
+  dataHash?: string
+  ipfsUrls?: {
+    pdf: string
+    data: string
+  }
 }
 
 export interface Theater {
