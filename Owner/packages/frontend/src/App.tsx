@@ -12,19 +12,19 @@ function App() {
     return (
         <AppProviders>
 
-                <ToastProvider>
-                    <Router>
-                        <div className="min-h-screen bg-gray-50">
-                            <PrivyDebug />
-                            <Navbar />
-                            <Routes>
-                                <Route path="/" element={<HomePage />} />
-                                <Route path="/dashboard" element={<TheaterDashboard />} />
-                                <Route path="*" element={<Navigate to="/" replace />} />
-                            </Routes>
-                        </div>
-                    </Router>
-                </ToastProvider>
+            <ToastProvider>
+                <Router>
+                    <div className="min-h-screen bg-gray-50">
+                        <PrivyDebug />
+                        <Navbar />
+                        <Routes>
+                            <Route path="/" element={<HomePage />} />
+                            <Route path="/dashboard" element={<TheaterDashboard />} />
+                            <Route path="*" element={<Navigate to="/" replace />} />
+                        </Routes>
+                    </div>
+                </Router>
+            </ToastProvider>
 
         </AppProviders>
     )

@@ -66,7 +66,7 @@ export function EventManagement({ onBackToDashboard }: EventManagementProps) {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center pt-16">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
           <p className="mt-4 text-gray-600">Loading your approved theaters...</p>
@@ -77,7 +77,7 @@ export function EventManagement({ onBackToDashboard }: EventManagementProps) {
 
   if (approvedTheaters.length === 0) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center pt-16">
         <div className="text-center max-w-md mx-auto p-6">
           <Film className="h-16 w-16 text-gray-400 mx-auto mb-4" />
           <h2 className="text-2xl font-bold text-gray-900 mb-2">No Approved Theaters</h2>
@@ -108,7 +108,7 @@ export function EventManagement({ onBackToDashboard }: EventManagementProps) {
 
   if (selectedTheater) {
     return (
-      <div className="min-h-screen bg-gray-50 p-6">
+      <div className="min-h-screen bg-gray-50 p-6 pt-20">
         <div className="max-w-6xl mx-auto">
           {/* Header */}
           <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
@@ -201,7 +201,7 @@ export function EventManagement({ onBackToDashboard }: EventManagementProps) {
 
   // Theater Selection View
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
+    <div className="min-h-screen bg-gray-50 p-6 pt-20">
       <div className="max-w-6xl mx-auto">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Manage Events</h1>
@@ -300,7 +300,7 @@ function CreateEventForm({ theater, onBack, onEventCreated }: {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
+    <div className="min-h-screen bg-gray-50 p-6 pt-20">
       <div className="max-w-2xl mx-auto">
         <div className="bg-white rounded-lg shadow-sm p-6">
           <div className="flex items-center space-x-4 mb-6">

@@ -1,12 +1,20 @@
 import { Link } from 'react-router-dom'
+import { useState } from 'react'
 import { useSimpleAuth } from '../../hooks/useSimpleAuth'
+import { EventManagement } from './EventManagement'
 
 export function HomePage() {
     const { authenticated, user } = useSimpleAuth()
+    const [showEventManagement, setShowEventManagement] = useState(false)
+
+    // If showing event management, render that component
+    if (showEventManagement) {
+        return <EventManagement onBackToDashboard={() => setShowEventManagement(false)} />
+    }
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
-            <div className="max-w-7xl mx-auto px-6 py-12">
+            <div className="max-w-7xl mx-auto px-6 py-12 pt-20">
                 {!authenticated ? (
                     // Show welcome message for non-authenticated users
                     <div className="text-center py-20">
@@ -62,7 +70,10 @@ export function HomePage() {
                                     <p className="text-sm text-slate-400">Add and manage your theaters</p>
                                 </Link>
 
-                                <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-2xl p-6 hover:bg-slate-800/70 transition-all duration-200 cursor-pointer group">
+                                <div
+                                    onClick={() => setShowEventManagement(true)}
+                                    className="bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-2xl p-6 hover:bg-slate-800/70 transition-all duration-200 cursor-pointer group"
+                                >
                                     <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform duration-200">
                                         <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
