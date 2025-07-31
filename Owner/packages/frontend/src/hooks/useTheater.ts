@@ -1,19 +1,34 @@
 import { useState, useEffect } from 'react'
 import { Theater, TheaterFormData, TheaterStats } from '../types/theater'
 import { theaterService } from '../services/theaterService'
+import { useSimpleAuth } from './useSimpleAuth'
 
 export function useTheater() {
+  const { user } = useSimpleAuth()
   const [theaters, setTheaters] = useState<Theater[]>([])
   const [stats, setStats] = useState<TheaterStats | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Load theaters when user changes
+  useEffect(() => {
+    if (user?.id) {
+      loadTheaters()
+      loadStats()
+    }
+  }, [user?.id])
 
   // Load theaters
   const loadTheaters = async () => {
     try {
       setLoading(true)
       setError(null)
-      const data = await theaterService.getOwnerTheaters()
+      
+      // Pass user ID to fetch theaters from blockchain
+      const userId = user?.id
+      console.log('🔍 Loading theaters for user:', userId)
+      
+      const data = await theaterService.getOwnerTheaters(userId)
       setTheaters(data)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load theaters')
@@ -37,7 +52,18 @@ export function useTheater() {
     try {
       setLoading(true)
       setError(null)
-      const newTheater = await theaterService.submitTheaterApplication(data)
+      
+      // Pass the user ID to the theater service for blockchain submission
+      const userId = user?.id
+      console.log('🔑 User ID for blockchain submission:', userId)
+      console.log('🔑 Full user:', user)
+      
+      if (!userId) {
+        console.error('❌ No user ID available from user object')
+        throw new Error('User must be authenticated to submit theater application')
+      }
+      
+      const newTheater = await theaterService.submitTheaterApplication(data, userId)
       setTheaters(prev => [...prev, newTheater])
       await loadStats() // Refresh stats
       return newTheater

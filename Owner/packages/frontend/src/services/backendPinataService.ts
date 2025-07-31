@@ -15,15 +15,15 @@ export class BackendPinataService {
   static debugCredentials() {
     console.log('🔍 Using backend proxy for IPFS uploads')
     console.log('Backend URL:', this.API_BASE_URL)
-    console.log('Test endpoint:', `${this.API_BASE_URL}/api/ipfs/test`)
-    console.log('Upload endpoint:', `${this.API_BASE_URL}/api/ipfs/upload-file`)
+    console.log('Test endpoint:', `${this.API_BASE_URL}/ipfs/test`)
+    console.log('Upload endpoint:', `${this.API_BASE_URL}/ipfs/upload-file`)
   }
 
   static async testConnection(): Promise<boolean> {
     try {
       console.log('🔍 Testing backend IPFS connection...')
       
-      const response = await fetch(`${this.API_BASE_URL}/api/ipfs/test`)
+      const response = await fetch(`${this.API_BASE_URL}/ipfs/test`)
       const result = await response.json()
       
       console.log('Backend IPFS test result:', result)
@@ -48,7 +48,7 @@ export class BackendPinataService {
         formData.append('keyvalues', JSON.stringify(metadata.keyvalues))
       }
 
-      const response = await fetch(`${this.API_BASE_URL}/api/ipfs/upload-file`, {
+      const response = await fetch(`${this.API_BASE_URL}/ipfs/upload-file`, {
         method: 'POST',
         body: formData,
       })
@@ -88,7 +88,7 @@ export class BackendPinataService {
       console.log('📋 JSON data size:', JSON.stringify(jsonData).length, 'characters')
       console.log('📋 Metadata:', metadata)
 
-      const response = await fetch(`${this.API_BASE_URL}/api/ipfs/upload-json`, {
+      const response = await fetch(`${this.API_BASE_URL}/ipfs/upload-json`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

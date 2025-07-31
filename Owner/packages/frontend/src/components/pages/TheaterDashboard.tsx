@@ -44,6 +44,38 @@ export function TheaterDashboard() {
     )
   }
 
+  const handlePreviewApplication = (theater: Theater) => {
+    if (theater.pdfHash) {
+      const ipfsUrl = `https://gateway.pinata.cloud/ipfs/${theater.pdfHash}`
+      console.log('🔍 Opening IPFS URL:', ipfsUrl)
+      window.open(ipfsUrl, '_blank')
+    } else {
+      alert('No application document available')
+    }
+  }
+
+  const handleCopyText = async (text?: string | null, label: string = 'Text') => {
+    if (text) {
+      try {
+        await navigator.clipboard.writeText(text)
+        alert(`${label} copied to clipboard!`)
+        console.log(`📋 Copied ${label}:`, text)
+      } catch (error) {
+        console.error(`Failed to copy ${label}:`, error)
+        // Fallback for older browsers
+        const textArea = document.createElement('textarea')
+        textArea.value = text
+        document.body.appendChild(textArea)
+        textArea.select()
+        document.execCommand('copy')
+        document.body.removeChild(textArea)
+        alert(`${label} copied to clipboard!`)
+      }
+    } else {
+      alert(`No ${label.toLowerCase()} available`)
+    }
+  }
+
   if (showAddForm) {
     return (
       <AddTheaterForm
@@ -145,19 +177,16 @@ export function TheaterDashboard() {
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Theater
+                    Application
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Location
+                    Submitted
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Manager
+                    Application ID
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Screens
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Seats
+                    Transaction Hash
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Status
@@ -179,27 +208,61 @@ export function TheaterDashboard() {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                      {theater.location}
-                    </td>
-                    {/* <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                      {theater.manager}
-                    </td> */}
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                      {theater.screens}
+                      {new Date(theater.createdAt).toLocaleDateString()}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                      {theater.totalSeats}
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-xs bg-gray-100 px-2 py-1 rounded">
+                          {theater.id ? `${theater.id.substring(0, 12)}...` : 'N/A'}
+                        </span>
+                        <button 
+                          onClick={() => handleCopyText(theater.id, 'Application ID')}
+                          className="text-blue-500 hover:text-blue-700"
+                          title="Copy Application ID"
+                        >
+                          📋
+                        </button>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-xs bg-gray-100 px-2 py-1 rounded">
+                          {theater.blockchainTxHash ? `${theater.blockchainTxHash.substring(0, 12)}...` : 'Loading...'}
+                        </span>
+                        {theater.blockchainTxHash && (
+                          <button 
+                            onClick={() => handleCopyText(theater.blockchainTxHash, 'Transaction Hash')}
+                            className="text-blue-500 hover:text-blue-700"
+                            title="Copy Transaction Hash"
+                          >
+                            📋
+                          </button>
+                        )}
+                      </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       {getStatusBadge(theater.status)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex items-center space-x-2">
-                        <button className="text-violet-600 hover:text-violet-900">
+                        {/* Preview PDF Button */}
+                        <button 
+                          onClick={() => handlePreviewApplication(theater)}
+                          className="text-violet-600 hover:text-violet-900 flex items-center gap-1"
+                          title="View Application PDF"
+                        >
                           <Eye size={16} />
+                          <span className="text-xs">View</span>
                         </button>
-                        <button className="text-gray-600 hover:text-gray-900">
+                        
+                        {/* Copy IPFS Hash Button */}
+                        <button 
+                          onClick={() => handleCopyIPFSHash(theater.pdfHash)}
+                          className="text-blue-600 hover:text-blue-900 flex items-center gap-1"
+                          title="Copy IPFS Hash"
+                        >
                           <Settings size={16} />
+                          <span className="text-xs">Copy</span>
                         </button>
                       </div>
                     </td>

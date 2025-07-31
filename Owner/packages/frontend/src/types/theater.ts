@@ -54,6 +54,9 @@ export interface Theater {
   ipfsUrls?: {
     pdf: string
   }
+  
+  // Blockchain Data
+  blockchainTxHash?: string | null
 }
 
 export interface TheaterStats {
