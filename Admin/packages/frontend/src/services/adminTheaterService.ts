@@ -50,6 +50,15 @@ class AdminTheaterService {
 
   // Helper method to convert blockchain application to UI format
   private convertBlockchainToUI(app: BlockchainApplication): TheaterApplication {
+    const uiStatus = this.mapBlockchainStatusToUI(app.status)
+
+    console.log('🔄 Converting blockchain app to UI:', {
+      applicationId: app.applicationId,
+      blockchainStatus: app.status,
+      blockchainStatusNumber: Number(app.status),
+      uiStatus: uiStatus
+    })
+
     return {
       id: app.applicationId,
       applicationId: app.applicationId,
@@ -67,7 +76,7 @@ class AdminTheaterService {
       totalSeats: 100,
       parkingSpaces: 10,
       gstNumber: 'View Application',
-      status: this.mapBlockchainStatusToUI(app.status),
+      status: uiStatus,
       submittedAt: new Date(app.submissionTimestamp * 1000).toISOString(),
       updatedAt: new Date(app.lastUpdated * 1000).toISOString(),
       pdfHash: app.ipfsHash,
@@ -81,12 +90,17 @@ class AdminTheaterService {
 
   // Helper method to map blockchain status to UI status
   private mapBlockchainStatusToUI(status: ApplicationStatus): 'pending' | 'approved' | 'rejected' | 'under_review' {
-    switch (status) {
-      case ApplicationStatus.Pending: return 'pending'
-      case ApplicationStatus.Approved: return 'approved'
-      case ApplicationStatus.Rejected: return 'rejected'
-      case ApplicationStatus.UnderReview: return 'under_review'
-      default: return 'pending'
+    const statusNumber = Number(status)
+    console.log('🔄 Mapping status:', { status, statusNumber, ApplicationStatus })
+
+    switch (statusNumber) {
+      case 0: return 'pending'    // ApplicationStatus.Pending
+      case 1: return 'approved'   // ApplicationStatus.Approved
+      case 2: return 'rejected'   // ApplicationStatus.Rejected
+      case 3: return 'under_review' // ApplicationStatus.UnderReview
+      default:
+        console.warn('⚠️ Unknown status:', statusNumber)
+        return 'pending'
     }
   }
 
@@ -153,8 +167,17 @@ class AdminTheaterService {
   async approveApplication(applicationId: string, adminNotes?: string): Promise<TheaterApplication> {
     try {
       console.log('✅ Approving theater application on blockchain:', applicationId)
+      console.log('📝 Admin notes:', adminNotes)
 
       await this.registryService.initialize()
+      console.log('🔗 Registry service initialized for approval')
+
+      console.log('📡 Calling updateApplicationStatus with:', {
+        applicationId,
+        status: ApplicationStatus.Approved,
+        statusNumber: Number(ApplicationStatus.Approved),
+        notes: adminNotes || 'Application approved by admin'
+      })
 
       const txHash = await this.registryService.updateApplicationStatus(
         applicationId,
@@ -164,11 +187,22 @@ class AdminTheaterService {
 
       console.log('✅ Application approved on blockchain, tx:', txHash)
 
+      // Wait a moment for the blockchain to update
+      await new Promise(resolve => setTimeout(resolve, 2000))
+
       // Fetch updated application details
+      console.log('🔍 Fetching updated application details...')
       const updatedApp = await this.registryService.getApplicationDetails(applicationId)
       if (!updatedApp) {
         throw new Error('Failed to fetch updated application')
       }
+
+      console.log('📊 Updated application status:', {
+        applicationId: updatedApp.applicationId,
+        oldStatus: 0,
+        newStatus: updatedApp.status,
+        statusNumber: Number(updatedApp.status)
+      })
 
       return this.convertBlockchainToUI(updatedApp)
     } catch (error) {
@@ -181,10 +215,20 @@ class AdminTheaterService {
   async rejectApplication(applicationId: string, rejectionReason: string, adminNotes?: string): Promise<TheaterApplication> {
     try {
       console.log('❌ Rejecting theater application on blockchain:', applicationId)
+      console.log('📝 Rejection reason:', rejectionReason)
+      console.log('📝 Admin notes:', adminNotes)
 
       await this.registryService.initialize()
+      console.log('🔗 Registry service initialized for rejection')
 
       const notes = `Rejection Reason: ${rejectionReason}${adminNotes ? `. Admin Notes: ${adminNotes}` : ''}`
+
+      console.log('📡 Calling updateApplicationStatus with:', {
+        applicationId,
+        status: ApplicationStatus.Rejected,
+        statusNumber: Number(ApplicationStatus.Rejected),
+        notes
+      })
 
       const txHash = await this.registryService.updateApplicationStatus(
         applicationId,
@@ -194,11 +238,22 @@ class AdminTheaterService {
 
       console.log('❌ Application rejected on blockchain, tx:', txHash)
 
+      // Wait a moment for the blockchain to update
+      await new Promise(resolve => setTimeout(resolve, 2000))
+
       // Fetch updated application details
+      console.log('🔍 Fetching updated application details...')
       const updatedApp = await this.registryService.getApplicationDetails(applicationId)
       if (!updatedApp) {
         throw new Error('Failed to fetch updated application')
       }
+
+      console.log('📊 Updated application status:', {
+        applicationId: updatedApp.applicationId,
+        oldStatus: 0,
+        newStatus: updatedApp.status,
+        statusNumber: Number(updatedApp.status)
+      })
 
       return this.convertBlockchainToUI(updatedApp)
     } catch (error) {

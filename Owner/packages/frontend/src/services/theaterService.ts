@@ -98,51 +98,122 @@ class TheaterService {
 
       // Initialize TheaterRegistry contract (read-only, no signer needed)
       const theaterRegistry = new TheaterRegistryService()
-      const accounts = await provider.listAccounts()
+      const accounts = await (provider as any).listAccounts()
       if (accounts.length === 0) {
         throw new Error('No accounts available in Ganache')
       }
       
-      const signer = await provider.getSigner(accounts[0].address)
+      const signer = await (provider as any).getSigner(accounts[0].address)
       const initialized = await theaterRegistry.initialize(provider, signer)
 
       if (!initialized) {
         throw new Error('Failed to initialize TheaterRegistry contract')
       }
 
-      // Fetch user applications from blockchain
-      console.log('📡 Fetching applications for UID:', uid)
-      const applications = await theaterRegistry.getUserApplications(uid)
-      console.log('📡 Found applications:', applications)
+      // WORKAROUND: The smart contract has a bug where getUserApplications doesn't reflect
+      // status updates made by admin. We need to:
+      // 1. Get user applications to find application IDs
+      // 2. Fetch each application individually to get the latest status
 
-      // Convert blockchain applications to Theater format and fetch transaction hashes
-      const theaters: Theater[] = await Promise.all(
-        applications.map(async (app, index) => {
-          // Try to get transaction hash from blockchain events
-          const txHash = await this.getTransactionHashForApplication(app.ipfsHash, theaterRegistry)
+      console.log('📡 Step 1: Fetching user applications for UID:', uid)
+      const userApps = await theaterRegistry.getUserApplications(uid)
+      console.log('📡 Found user applications:', userApps.length)
+
+      if (userApps.length === 0) {
+        console.log('📡 No applications found for user')
+        return []
+      }
+
+      // Step 2: For each application, find its ID and get the latest status
+      console.log('📡 Step 2: Fetching latest status for each application...')
+      const theaters: Theater[] = []
+
+      for (let index = 0; index < userApps.length; index++) {
+        const app = userApps[index]
+        
+        // Generate the application ID (this matches the smart contract logic)
+        const applicationId = `APP_${index + 1}`
+        
+        console.log(`📡 Fetching latest status for ${applicationId}...`)
+        
+        try {
+          // Get the latest application data by ID (this will have the updated status)
+          const latestApp = await theaterRegistry.getApplication(applicationId)
           
-          return {
-            id: `blockchain_${app.ipfsHash}`, // Use IPFS hash as unique ID
-            name: `Theater Application #${index + 1}`,
-            location: 'View Application', // Simple text indicating they need to view the PDF
-            screens: 1, // Default value
-            totalSeats: 100, // Default value
-            status: this.mapBlockchainStatusToTheaterStatus(app.status),
-            createdAt: new Date(app.submissionTimestamp * 1000).toISOString(),
-            updatedAt: new Date(app.lastUpdated * 1000).toISOString(),
-            ownerName: 'View Application', // Indicate they need to view the PDF
-            ownerEmail: 'View Application',
-            ownerPhone: 'View Application',
-            pdfHash: app.ipfsHash,
-            ipfsUrls: {
-              pdf: `https://gateway.pinata.cloud/ipfs/${app.ipfsHash}`
-            },
-            blockchainTxHash: txHash
-          }
-        })
-      )
+          if (latestApp) {
+            console.log(`📊 Application ${applicationId} latest status:`, {
+              ipfsHash: latestApp.ipfsHash,
+              status: latestApp.status,
+              statusNumber: Number(latestApp.status),
+              submissionTime: new Date(latestApp.submissionTimestamp * 1000).toLocaleString(),
+              lastUpdated: new Date(latestApp.lastUpdated * 1000).toLocaleString()
+            })
 
-      console.log('✅ Converted to theaters:', theaters)
+            // Try to get transaction hash from blockchain events
+            const txHash = await this.getTransactionHashForApplication(latestApp.ipfsHash, theaterRegistry)
+            
+            const mappedStatus = this.mapBlockchainStatusToTheaterStatus(latestApp.status)
+            
+            console.log(`🎯 Final theater ${applicationId} conversion:`, {
+              ipfsHash: latestApp.ipfsHash,
+              rawStatus: latestApp.status,
+              statusNumber: Number(latestApp.status),
+              mappedStatus: mappedStatus,
+              submissionTime: new Date(latestApp.submissionTimestamp * 1000).toLocaleString(),
+              lastUpdated: new Date(latestApp.lastUpdated * 1000).toLocaleString()
+            })
+            
+            theaters.push({
+              id: `blockchain_${latestApp.ipfsHash}`, // Use IPFS hash as unique ID
+              name: `Theater Application ${applicationId}`,
+              location: 'View Application', // Simple text indicating they need to view the PDF
+              screens: 1, // Default value
+              totalSeats: 100, // Default value
+              status: mappedStatus,
+              createdAt: new Date(latestApp.submissionTimestamp * 1000).toISOString(),
+              updatedAt: new Date(latestApp.lastUpdated * 1000).toISOString(),
+              ownerName: 'View Application', // Indicate they need to view the PDF
+              ownerEmail: 'View Application',
+              ownerPhone: 'View Application',
+              pdfHash: latestApp.ipfsHash,
+              ipfsUrls: {
+                pdf: `https://gateway.pinata.cloud/ipfs/${latestApp.ipfsHash}`
+              },
+              blockchainTxHash: txHash
+            })
+          } else {
+            console.warn(`⚠️ Could not fetch latest status for ${applicationId}`)
+            // Fallback to original app data
+            const mappedStatus = this.mapBlockchainStatusToTheaterStatus(app.status)
+            const txHash = await this.getTransactionHashForApplication(app.ipfsHash, theaterRegistry)
+            
+            theaters.push({
+              id: `blockchain_${app.ipfsHash}`,
+              name: `Theater Application ${applicationId}`,
+              location: 'View Application',
+              screens: 1,
+              totalSeats: 100,
+              status: mappedStatus,
+              createdAt: new Date(app.submissionTimestamp * 1000).toISOString(),
+              updatedAt: new Date(app.lastUpdated * 1000).toISOString(),
+              ownerName: 'View Application',
+              ownerEmail: 'View Application',
+              ownerPhone: 'View Application',
+              pdfHash: app.ipfsHash,
+              ipfsUrls: {
+                pdf: `https://gateway.pinata.cloud/ipfs/${app.ipfsHash}`
+              },
+              blockchainTxHash: txHash
+            })
+          }
+        } catch (appError) {
+          console.error(`❌ Error fetching ${applicationId}:`, appError)
+          // Continue with next application
+          continue
+        }
+      }
+
+      console.log('✅ Final theaters with latest status:', theaters)
       return theaters
 
     } catch (error) {
@@ -206,13 +277,22 @@ class TheaterService {
   }
 
   // Helper method to map blockchain status to theater status
-  private mapBlockchainStatusToTheaterStatus(blockchainStatus: number): 'pending' | 'active' | 'inactive' | 'rejected' {
-    switch (blockchainStatus) {
+  private mapBlockchainStatusToTheaterStatus(blockchainStatus: any): 'pending' | 'active' | 'inactive' | 'rejected' {
+    const statusNumber = Number(blockchainStatus)
+    console.log('🔄 Owner mapping blockchain status:', { 
+      blockchainStatus, 
+      statusNumber,
+      willMapTo: statusNumber === 0 ? 'pending' : statusNumber === 1 ? 'active' : statusNumber === 2 ? 'rejected' : 'pending'
+    })
+    
+    switch (statusNumber) {
       case 0: return 'pending'    // ApplicationStatus.Pending
       case 1: return 'active'     // ApplicationStatus.Approved
       case 2: return 'rejected'   // ApplicationStatus.Rejected
-      case 3: return 'pending'    // ApplicationStatus.UnderReview
-      default: return 'pending'
+      case 3: return 'pending'    // ApplicationStatus.UnderReview (show as pending for owner)
+      default: 
+        console.warn('⚠️ Unknown blockchain status:', statusNumber)
+        return 'pending'
     }
   }
 

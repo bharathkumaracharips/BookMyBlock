@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Plus, Building2, Users, Calendar, Settings, Eye, Loader2 } from 'lucide-react'
 import { AddTheaterForm } from '../theater/AddTheaterForm'
 import { useTheater } from '../../hooks/useTheater'
@@ -6,7 +6,34 @@ import { Theater } from '../../types/theater'
 
 export function TheaterDashboard() {
   const [showAddForm, setShowAddForm] = useState(false)
-  const { theaters, stats, loading, error, submitTheater } = useTheater()
+  const [lastRefresh, setLastRefresh] = useState<Date>(new Date())
+  const [isRefreshing, setIsRefreshing] = useState(false)
+  const { theaters, stats, loading, error, submitTheater, refreshData } = useTheater()
+
+  // Auto-refresh when page becomes visible (user switches back to tab)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden && refreshData) {
+        console.log('🔄 Page became visible, refreshing theater data...')
+        refreshData()
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+  }, [refreshData])
+
+  // Auto-refresh every 30 seconds when component is active
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (!document.hidden && refreshData) {
+        console.log('🔄 Auto-refresh: Updating theater data...')
+        refreshData()
+      }
+    }, 30000) // 30 seconds
+
+    return () => clearInterval(interval)
+  }, [refreshData])
 
   const handleAddTheater = async (theaterData: any): Promise<boolean> => {
     try {
@@ -35,7 +62,7 @@ export function TheaterDashboard() {
       inactive: { bg: 'bg-gray-100', text: 'text-gray-800', label: 'Inactive' },
       rejected: { bg: 'bg-red-100', text: 'text-red-800', label: 'Rejected' }
     }
-    
+
     const config = statusConfig[status]
     return (
       <span className={`px-2 py-1 rounded-full text-xs font-medium ${config.bg} ${config.text}`}>
@@ -92,14 +119,35 @@ export function TheaterDashboard() {
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Theater Management</h1>
           <p className="text-gray-600 mt-1">Manage your theaters and track their performance</p>
+          <p className="text-sm text-gray-500 mt-1">
+            Last updated: {lastRefresh.toLocaleTimeString()} • Auto-refreshes every 30s
+          </p>
         </div>
-        <button
-          onClick={() => setShowAddForm(true)}
-          className="px-6 py-3 bg-violet-500 text-white rounded-lg hover:bg-violet-600 flex items-center gap-2 shadow-lg hover:shadow-xl transition-all"
-        >
-          <Plus size={20} />
-          Add New Theater
-        </button>
+        <div className="flex gap-3">
+          <button
+            onClick={async () => {
+              setIsRefreshing(true)
+              await refreshData()
+              setLastRefresh(new Date())
+              setIsRefreshing(false)
+            }}
+            disabled={isRefreshing}
+            className="px-4 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 flex items-center gap-2 shadow-lg hover:shadow-xl transition-all disabled:opacity-50"
+            title="Refresh theater data from blockchain"
+          >
+            <svg className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            {isRefreshing ? 'Refreshing...' : 'Refresh'}
+          </button>
+          <button
+            onClick={() => setShowAddForm(true)}
+            className="px-6 py-3 bg-violet-500 text-white rounded-lg hover:bg-violet-600 flex items-center gap-2 shadow-lg hover:shadow-xl transition-all"
+          >
+            <Plus size={20} />
+            Add New Theater
+          </button>
+        </div>
       </div>
 
       {/* Stats Cards */}
@@ -115,7 +163,7 @@ export function TheaterDashboard() {
             <Building2 className="h-8 w-8 text-violet-500" />
           </div>
         </div>
-        
+
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
           <div className="flex items-center justify-between">
             <div>
@@ -127,7 +175,7 @@ export function TheaterDashboard() {
             <Building2 className="h-8 w-8 text-green-500" />
           </div>
         </div>
-        
+
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
           <div className="flex items-center justify-between">
             <div>
@@ -139,7 +187,7 @@ export function TheaterDashboard() {
             <Calendar className="h-8 w-8 text-blue-500" />
           </div>
         </div>
-        
+
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
           <div className="flex items-center justify-between">
             <div>
@@ -158,7 +206,7 @@ export function TheaterDashboard() {
         <div className="px-6 py-4 border-b border-gray-100">
           <h2 className="text-lg font-semibold text-gray-900">Your Theaters</h2>
         </div>
-        
+
         {theaters.length === 0 ? (
           <div className="text-center py-12">
             <Building2 className="mx-auto h-12 w-12 text-gray-400 mb-4" />
@@ -215,7 +263,7 @@ export function TheaterDashboard() {
                         <span className="font-mono text-xs bg-gray-100 px-2 py-1 rounded">
                           {theater.id ? `${theater.id.substring(0, 12)}...` : 'N/A'}
                         </span>
-                        <button 
+                        <button
                           onClick={() => handleCopyText(theater.id, 'Application ID')}
                           className="text-blue-500 hover:text-blue-700"
                           title="Copy Application ID"
@@ -230,7 +278,7 @@ export function TheaterDashboard() {
                           {theater.blockchainTxHash ? `${theater.blockchainTxHash.substring(0, 12)}...` : 'Loading...'}
                         </span>
                         {theater.blockchainTxHash && (
-                          <button 
+                          <button
                             onClick={() => handleCopyText(theater.blockchainTxHash, 'Transaction Hash')}
                             className="text-blue-500 hover:text-blue-700"
                             title="Copy Transaction Hash"
@@ -246,7 +294,7 @@ export function TheaterDashboard() {
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex items-center space-x-2">
                         {/* Preview PDF Button */}
-                        <button 
+                        <button
                           onClick={() => handlePreviewApplication(theater)}
                           className="text-violet-600 hover:text-violet-900 flex items-center gap-1"
                           title="View Application PDF"
@@ -254,9 +302,9 @@ export function TheaterDashboard() {
                           <Eye size={16} />
                           <span className="text-xs">View</span>
                         </button>
-                        
+
                         {/* Copy IPFS Hash Button */}
-                        <button 
+                        <button
                           onClick={() => handleCopyIPFSHash(theater.pdfHash)}
                           className="text-blue-600 hover:text-blue-900 flex items-center gap-1"
                           title="Copy IPFS Hash"

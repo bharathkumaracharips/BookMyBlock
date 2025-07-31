@@ -129,6 +129,12 @@ export function useTheater() {
     loadStats()
   }, [])
 
+  // Manual refresh function
+  const refreshData = async () => {
+    console.log('🔄 Manual refresh triggered')
+    await Promise.all([loadTheaters(), loadStats()])
+  }
+
   return {
     theaters,
     stats,
@@ -140,5 +146,6 @@ export function useTheater() {
     uploadDocument,
     loadTheaters,
     loadStats,
+    refreshData
   }
 }
