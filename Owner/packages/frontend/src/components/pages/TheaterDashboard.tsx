@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react'
 import { Plus, Building2, Users, Calendar, Settings, Eye, Loader2 } from 'lucide-react'
 import { AddTheaterForm } from '../theater/AddTheaterForm'
+import { EventManagement } from './EventManagement'
 import { useTheater } from '../../hooks/useTheater'
 import { Theater } from '../../types/theater'
 
 export function TheaterDashboard() {
   const [showAddForm, setShowAddForm] = useState(false)
+  const [showManageEvents, setShowManageEvents] = useState(false)
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date())
   const [isRefreshing, setIsRefreshing] = useState(false)
   const { theaters, stats, loading, error, submitTheater, refreshData } = useTheater()
@@ -112,6 +114,10 @@ export function TheaterDashboard() {
     )
   }
 
+  if (showManageEvents) {
+    return <EventManagement onBackToDashboard={() => setShowManageEvents(false)} />
+  }
+
   return (
     <div className="max-w-7xl mx-auto p-6">
       {/* Header */}
@@ -146,6 +152,13 @@ export function TheaterDashboard() {
           >
             <Plus size={20} />
             Add New Theater
+          </button>
+          <button
+            onClick={() => setShowManageEvents(true)}
+            className="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 flex items-center gap-2 shadow-lg hover:shadow-xl transition-all"
+          >
+            <Calendar size={20} />
+            Manage Events
           </button>
         </div>
       </div>
