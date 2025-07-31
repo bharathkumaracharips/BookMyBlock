@@ -10,13 +10,21 @@ class EventController {
   // Create a new event
   static async createEvent(req, res) {
     try {
-      const { theaterId, movieTitle, showDate, showTime, ticketPrice, description } = req.body
+      const { theaterId, movieTitle, startDate, endDate, showTimes, ticketPrice, description, ipfsHash, ipfsUrl } = req.body
 
       // Validate required fields
-      if (!theaterId || !movieTitle || !showDate || !showTime || !ticketPrice) {
+      if (!theaterId || !movieTitle || !startDate || !endDate || !showTimes || !ticketPrice) {
         return res.status(400).json({
           success: false,
-          message: 'Missing required fields: theaterId, movieTitle, showDate, showTime, ticketPrice'
+          message: 'Missing required fields: theaterId, movieTitle, startDate, endDate, showTimes, ticketPrice'
+        })
+      }
+
+      // Validate show times array
+      if (!Array.isArray(showTimes) || showTimes.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'At least one show time is required'
         })
       }
 
@@ -28,12 +36,22 @@ class EventController {
         })
       }
 
-      // Validate show date (must be in the future)
-      const showDateTime = new Date(`${showDate}T${showTime}`)
-      if (showDateTime <= new Date()) {
+      // Validate dates
+      const start = new Date(startDate)
+      const end = new Date(endDate)
+      const now = new Date()
+
+      if (start < now.setHours(0, 0, 0, 0)) {
         return res.status(400).json({
           success: false,
-          message: 'Show date and time must be in the future'
+          message: 'Start date must be today or in the future'
+        })
+      }
+
+      if (end < start) {
+        return res.status(400).json({
+          success: false,
+          message: 'End date must be after start date'
         })
       }
 
@@ -42,10 +60,13 @@ class EventController {
         id: `event_${EventController.eventIdCounter++}`,
         theaterId,
         movieTitle,
-        showDate,
-        showTime,
+        startDate,
+        endDate,
+        showTimes,
         ticketPrice: parseInt(ticketPrice),
         description: description || '',
+        ipfsHash: ipfsHash || null,
+        ipfsUrl: ipfsUrl || null,
         status: 'upcoming',
         availableSeats: 100, // Default - would come from theater data
         totalSeats: 100,     // Default - would come from theater data
@@ -205,14 +226,28 @@ class EventController {
 
       // Calculate stats from in-memory events
       const now = new Date()
+      const today = now.toISOString().split('T')[0]
+      
       const stats = {
         totalEvents: EventController.events.length,
         upcomingEvents: EventController.events.filter(event => {
-          const eventDateTime = new Date(`${event.showDate}T${event.showTime}`)
-          return eventDateTime > now && event.status === 'upcoming'
+          const eventStartDate = new Date(event.startDate || event.showDate)
+          return eventStartDate >= now && event.status === 'upcoming'
         }).length,
-        ongoingEvents: EventController.events.filter(event => event.status === 'ongoing').length,
-        completedEvents: EventController.events.filter(event => event.status === 'completed').length,
+        ongoingEvents: EventController.events.filter(event => {
+          if (event.startDate && event.endDate) {
+            const startDate = event.startDate
+            const endDate = event.endDate
+            return startDate <= today && endDate >= today && event.status === 'upcoming'
+          }
+          return event.status === 'ongoing'
+        }).length,
+        completedEvents: EventController.events.filter(event => {
+          if (event.endDate) {
+            return new Date(event.endDate) < now || event.status === 'completed'
+          }
+          return event.status === 'completed'
+        }).length,
         totalRevenue: EventController.events.reduce((total, event) => {
           const soldSeats = event.totalSeats - event.availableSeats
           return total + (soldSeats * event.ticketPrice)

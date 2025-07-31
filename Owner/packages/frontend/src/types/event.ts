@@ -3,13 +3,16 @@ export interface Event {
   theaterId: string
   theaterName: string
   movieTitle: string
-  showDate: string
-  showTime: string
+  startDate: string
+  endDate: string
+  showTimes: string[]
   ticketPrice: number
   availableSeats: number
   totalSeats: number
   status: 'upcoming' | 'ongoing' | 'completed' | 'cancelled'
   description?: string
+  ipfsHash?: string
+  ipfsUrl?: string
   createdAt: string
   updatedAt: string
 }
@@ -17,10 +20,13 @@ export interface Event {
 export interface CreateEventData {
   theaterId: string
   movieTitle: string
-  showDate: string
-  showTime: string
+  startDate: string
+  endDate: string
+  showTimes: string[]
   ticketPrice: number
   description?: string
+  ipfsHash?: string
+  ipfsUrl?: string
 }
 
 export interface EventStats {
