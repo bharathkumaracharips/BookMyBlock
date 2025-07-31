@@ -1,10 +1,3 @@
-/**
- * Simple Authentication Hook - Singleton Pattern
- * 
- * Single source of truth for authentication across the entire app.
- * Prevents multiple instances from running simultaneously.
- */
-
 import { usePrivy, useWallets } from '@privy-io/react-auth'
 import { useState, useEffect, useCallback } from 'react'
 import { BlockchainLogger } from '../services/blockchainLogger'
@@ -35,7 +28,6 @@ class AuthenticationManager {
       const success = await this.logger.initialize()
       return success
     } catch (error) {
-      console.error('Failed to initialize blockchain logger:', error)
       return false
     }
   }
@@ -49,7 +41,6 @@ class AuthenticationManager {
 
     // Ensure logger is initialized
     if (!this.logger) {
-      console.error('Blockchain logger not initialized')
       return false
     }
 
@@ -59,7 +50,6 @@ class AuthenticationManager {
       
       return await this.logger.isUserLoggedIn(userId)
     } catch (error) {
-      console.error('Failed to check blockchain login status:', error)
       return false
     }
   }
@@ -79,27 +69,11 @@ class AuthenticationManager {
     this.processedUsers.clear()
   }
 
-  async processAuthentication(userId: string, walletAddress: string): Promise<string | null> {
-    console.log('🔄 Admin Auth: Starting processAuthentication for user:', userId, 'wallet:', walletAddress)
-    
+  async processAuthentication(userId: string, walletAddress: string): Promise<string | null> {    
     // Prevent multiple simultaneous processing
     if (this.isProcessing) {
-      console.log('⏸️ Admin Auth: Already processing, skipping')
       return null
     }
-
-    // Prevent processing the same user multiple times
-    if (this.currentUserId === userId) {
-      console.log('⏸️ Admin Auth: Same user already being processed, skipping')
-      return null
-    }
-
-    // Check if user has already been processed in this session
-    if (this.isUserProcessed(userId)) {
-      console.log('⏸️ Admin Auth: User already processed in this session, skipping')
-      return null
-    }
-
     this.isProcessing = true
     this.currentUserId = userId
     console.log('🔄 Admin Auth: Processing started for user:', userId)

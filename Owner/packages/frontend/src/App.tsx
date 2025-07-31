@@ -1,22 +1,22 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { AppProviders } from './providers/PrivyProvider'
 import { ToastProvider } from './components/ui/Toast'
-import { Navigation } from './components/layout/Navigation'
+import { Navbar } from './components/layout/Navbar'
 import { TheaterDashboard } from './components/pages/TheaterDashboard'
 import { HomePage } from './components/pages/HomePage'
 import { PrivyDebug } from './components/debug/PrivyDebug'
-import { AppLayout } from './components/layout/AppLayout'
+
 import './index.css'
 
 function App() {
     return (
         <AppProviders>
-            <AppLayout>
+
                 <ToastProvider>
                     <Router>
                         <div className="min-h-screen bg-gray-50">
                             <PrivyDebug />
-                            <Navigation />
+                            <Navbar />
                             <Routes>
                                 <Route path="/" element={<HomePage />} />
                                 <Route path="/dashboard" element={<TheaterDashboard />} />
@@ -25,7 +25,7 @@ function App() {
                         </div>
                     </Router>
                 </ToastProvider>
-            </AppLayout>
+
         </AppProviders>
     )
 }

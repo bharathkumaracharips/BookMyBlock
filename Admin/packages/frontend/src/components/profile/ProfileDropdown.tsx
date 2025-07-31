@@ -5,19 +5,6 @@ export function ProfileDropdown() {
   const { authenticated, user, embeddedWallet, logout } = useSimpleAuth()
   const [isOpen, setIsOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
-
-  // Debug logging for Admin dashboard
-  useEffect(() => {
-    console.log('🔧 Admin ProfileDropdown Debug:', {
-      authenticated,
-      hasUser: !!user,
-      userId: user?.id,
-      hasEmbeddedWallet: !!embeddedWallet,
-      walletAddress: embeddedWallet?.address,
-      walletType: embeddedWallet?.walletClientType
-    })
-  }, [authenticated, user, embeddedWallet])
-
   // Close dropdown when clicking outside
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
