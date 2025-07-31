@@ -181,9 +181,9 @@ export function TheaterDashboard() {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                       {theater.location}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                    {/* <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                       {theater.manager}
-                    </td>
+                    </td> */}
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                       {theater.screens}
                     </td>

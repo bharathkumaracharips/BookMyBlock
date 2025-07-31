@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { processPhoneNumber, getValidationError, formatForDisplay } from '../../utils/phoneFormatter'
+import { processPhoneNumber, getValidationError } from '../../utils/phoneFormatter'
 
 interface PhoneInputProps {
   value: string

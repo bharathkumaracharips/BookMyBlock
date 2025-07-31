@@ -22,34 +22,79 @@ class TheaterService {
     console.log('📄 PDF Hash:', data.pdfHash)
     console.log('🔗 IPFS URL:', data.ipfsUrls)
     
-    // For now, return a mock theater object since the backend endpoint doesn't exist yet
-    // TODO: Implement actual API call to backend
-    const mockTheater: Theater = {
-      id: `theater_${Date.now()}`,
-      name: data.theaterName,
-      location: `${data.city}, ${data.state}`,
-      screens: data.numberOfScreens,
-      totalSeats: data.totalSeats,
-      status: 'pending' as const,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      // Add IPFS data to the theater record
-      pdfHash: data.pdfHash,
-      ipfsUrls: data.ipfsUrls
+    try {
+      // Submit to backend admin API
+      const response = await fetch(`${API_BASE_URL}/admin/theater-requests`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data)
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to submit theater application')
+      }
+
+      const result = await response.json()
+      
+      if (!result.success) {
+        throw new Error(result.message || 'Failed to submit theater application')
+      }
+
+      console.log('✅ Theater application submitted successfully:', result.data.id)
+      
+      // Convert backend response to Theater format
+      const theater: Theater = {
+        id: result.data.id,
+        name: result.data.theaterName,
+        location: `${result.data.city}, ${result.data.state}`,
+        screens: result.data.numberOfScreens,
+        totalSeats: result.data.totalSeats,
+        status: result.data.status,
+        createdAt: result.data.submittedAt,
+        updatedAt: result.data.updatedAt,
+        ownerName: result.data.ownerName,
+        ownerEmail: result.data.ownerEmail,
+        ownerPhone: result.data.ownerPhone,
+        pdfHash: result.data.pdfHash,
+        ipfsUrls: result.data.ipfsUrls
+      }
+      
+      return theater
+    } catch (error) {
+      console.error('❌ Error submitting theater application:', error)
+      throw error
     }
-    
-    console.log('✅ Mock theater created:', mockTheater)
-    
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    
-    return mockTheater
   }
 
   // Get owner's theaters
   async getOwnerTheaters(): Promise<Theater[]> {
-    const response = await this.api.get('/owner')
-    return response.data
+    try {
+      // For now, return empty array since we don't have owner-specific endpoint
+      // In production, this would fetch from a proper owner endpoint
+      return []
+    } catch (error) {
+      console.error('Error fetching owner theaters:', error)
+      return []
+    }
+  }
+
+  // Get application status by ID
+  async getApplicationStatus(applicationId: string): Promise<any> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/admin/theater-requests/${applicationId}`)
+      const result = await response.json()
+      
+      if (!result.success) {
+        throw new Error(result.message || 'Failed to fetch application status')
+      }
+      
+      return result.data
+    } catch (error) {
+      console.error('Error fetching application status:', error)
+      throw error
+    }
   }
 
   // Get theater by ID

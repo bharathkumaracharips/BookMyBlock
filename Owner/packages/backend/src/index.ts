@@ -32,9 +32,11 @@ app.get('/health', (_req, res) => {
 
 // Import routes
 import ipfsRoutes from './routes/ipfs'
+import adminRoutes from './routes/admin'
 
 // API routes
 app.use('/api/ipfs', ipfsRoutes)
+app.use('/api/admin', adminRoutes)
 
 app.get('/api', (_req, res) => {
   res.json({ 

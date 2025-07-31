@@ -47,7 +47,7 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
     }
   }
 
-  const handleSocialLogin = async (provider: string) => {
+  const handleSocialLogin = async (_provider: string) => {
     setLoading(true)
     try {
       await login()

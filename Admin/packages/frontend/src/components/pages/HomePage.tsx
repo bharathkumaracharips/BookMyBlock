@@ -1,7 +1,10 @@
+import { useState } from 'react'
 import { useSimpleAuth } from '../../hooks/useSimpleAuth'
+import { TheaterReviewDashboard } from './TheaterReviewDashboard'
 
 export function HomePage() {
     const { authenticated, user } = useSimpleAuth()
+    const [currentView, setCurrentView] = useState<'dashboard' | 'theater-review'>('dashboard')
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 pt-20">
@@ -38,6 +41,8 @@ export function HomePage() {
                             </div>
                         </div>
                     </div>
+                ) : currentView === 'theater-review' ? (
+                    <TheaterReviewDashboard />
                 ) : (
                     // Show main content for authenticated users
                     <div className="text-center py-20">
@@ -50,7 +55,20 @@ export function HomePage() {
                             </p>
                             
                             {/* Main Action Cards */}
-                            <div className="grid md:grid-cols-3 gap-6 mb-12">
+                            <div className="grid md:grid-cols-4 gap-6 mb-12">
+                                <div 
+                                    onClick={() => setCurrentView('theater-review')}
+                                    className="bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-2xl p-6 hover:bg-slate-800/70 transition-all duration-200 cursor-pointer group"
+                                >
+                                    <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform duration-200">
+                                        <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                        </svg>
+                                    </div>
+                                    <h3 className="text-lg font-semibold text-white mb-2">Review Theaters</h3>
+                                    <p className="text-sm text-slate-400">Review pending theater applications</p>
+                                </div>
+
                                 <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-2xl p-6 hover:bg-slate-800/70 transition-all duration-200 cursor-pointer group">
                                     <div className="w-12 h-12 bg-gradient-to-br from-violet-500 to-purple-600 rounded-xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform duration-200">
                                         <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -81,6 +99,22 @@ export function HomePage() {
                                     <h3 className="text-lg font-semibold text-white mb-2">Analytics</h3>
                                     <p className="text-sm text-slate-400">View user analytics and reports</p>
                                 </div>
+                            </div>
+
+                            {/* Navigation */}
+                            <div className="mb-8">
+                                <button
+                                    onClick={() => setCurrentView('dashboard')}
+                                    className="px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-600 mr-4"
+                                >
+                                    Dashboard
+                                </button>
+                                <button
+                                    onClick={() => setCurrentView('theater-review')}
+                                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                                >
+                                    Theater Reviews
+                                </button>
                             </div>
 
                             {/* Quick Stats */}

@@ -18,7 +18,7 @@ export class UserAuthContractService {
   private contract: ethers.Contract | null = null
   private signer: ethers.Signer | null = null
 
-  async initialize(provider: ethers.Provider, signer: ethers.Signer): Promise<boolean> {
+  async initialize(signer: ethers.Signer): Promise<boolean> {
     try {
       this.signer = signer
       

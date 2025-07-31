@@ -6,7 +6,7 @@
  */
 
 import { usePrivy, useWallets } from '@privy-io/react-auth'
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { BlockchainLogger } from '../services/blockchainLogger'
 
 // Singleton instance to prevent multiple authentication processing
