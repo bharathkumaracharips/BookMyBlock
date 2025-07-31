@@ -23,8 +23,8 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }))
 
 // Health check endpoint
 app.get('/health', (_req, res) => {
-  res.json({ 
-    status: 'ok', 
+  res.json({
+    status: 'ok',
     message: 'BookMyBlock Backend API is running',
     timestamp: new Date().toISOString()
   })
@@ -39,7 +39,7 @@ app.use('/api/ipfs', ipfsRoutes)
 app.use('/api/admin', adminRoutes)
 
 app.get('/api', (_req, res) => {
-  res.json({ 
+  res.json({
     message: 'BookMyBlock API v1.0.0',
     status: 'Backend setup complete ✅',
     features: [

@@ -1,9 +1,10 @@
-import axios from 'axios'
-
-const API_BASE_URL = import.meta.env.VITE_OWNER_API_BASE_URL || 'http://localhost:8002/api'
+import { AdminTheaterRegistryService, ApplicationStatus, BlockchainApplication } from '../contracts/TheaterRegistry'
 
 export interface TheaterApplication {
   id: string
+  applicationId: string
+  uid: string
+  ownerWallet: string
   theaterName: string
   ownerName: string
   ownerEmail: string
@@ -17,13 +18,14 @@ export interface TheaterApplication {
   parkingSpaces: number
   amenities?: string[]
   gstNumber: string
-  status: 'pending' | 'approved' | 'rejected'
+  status: 'pending' | 'approved' | 'rejected' | 'under_review'
   submittedAt: string
   updatedAt: string
   pdfHash?: string
   ipfsUrls?: {
     pdf: string
   }
+  transactionHash?: string
   adminAction?: {
     action: 'approved' | 'rejected'
     rejectionReason?: string
@@ -31,6 +33,7 @@ export interface TheaterApplication {
     actionDate: string
     adminId: string
   }
+  reviewNotes?: string
 }
 
 export interface AdminDashboardStats {
@@ -38,108 +41,222 @@ export interface AdminDashboardStats {
   pendingApplications: number
   approvedApplications: number
   rejectedApplications: number
+  underReviewApplications: number
   recentApplications: TheaterApplication[]
 }
 
 class AdminTheaterService {
-  private api = axios.create({
-    baseURL: `${API_BASE_URL}/admin`,
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  })
+  private registryService = new AdminTheaterRegistryService()
 
-  // Get all pending theater applications
+  // Helper method to convert blockchain application to UI format
+  private convertBlockchainToUI(app: BlockchainApplication): TheaterApplication {
+    return {
+      id: app.applicationId,
+      applicationId: app.applicationId,
+      uid: app.uid,
+      ownerWallet: app.ownerWallet,
+      theaterName: `Theater Application`, // Will be fetched from IPFS if needed
+      ownerName: 'View Application', // Will be fetched from IPFS if needed
+      ownerEmail: 'View Application',
+      ownerPhone: 'View Application',
+      address: 'View Application',
+      city: 'View Application',
+      state: 'View Application',
+      pincode: 'View Application',
+      numberOfScreens: 1, // Default values
+      totalSeats: 100,
+      parkingSpaces: 10,
+      gstNumber: 'View Application',
+      status: this.mapBlockchainStatusToUI(app.status),
+      submittedAt: new Date(app.submissionTimestamp * 1000).toISOString(),
+      updatedAt: new Date(app.lastUpdated * 1000).toISOString(),
+      pdfHash: app.ipfsHash,
+      ipfsUrls: {
+        pdf: `https://gateway.pinata.cloud/ipfs/${app.ipfsHash}`
+      },
+      transactionHash: app.transactionHash,
+      reviewNotes: app.reviewNotes
+    }
+  }
+
+  // Helper method to map blockchain status to UI status
+  private mapBlockchainStatusToUI(status: ApplicationStatus): 'pending' | 'approved' | 'rejected' | 'under_review' {
+    switch (status) {
+      case ApplicationStatus.Pending: return 'pending'
+      case ApplicationStatus.Approved: return 'approved'
+      case ApplicationStatus.Rejected: return 'rejected'
+      case ApplicationStatus.UnderReview: return 'under_review'
+      default: return 'pending'
+    }
+  }
+
+  // Get all pending theater applications from blockchain
   async getPendingApplications(): Promise<TheaterApplication[]> {
     try {
-      console.log('📋 Fetching pending theater applications...')
-      const response = await this.api.get('/theater-requests')
-      
-      if (!response.data.success) {
-        throw new Error(response.data.message || 'Failed to fetch applications')
-      }
-      
-      console.log('✅ Fetched', response.data.total, 'pending applications')
-      return response.data.data
+      console.log('📋 Fetching pending theater applications from blockchain...')
+
+      await this.registryService.initialize()
+      const allApplications = await this.registryService.getAllApplications()
+
+      // Filter for pending applications
+      const pendingApps = allApplications
+        .filter(app => app.status === ApplicationStatus.Pending)
+        .map(app => this.convertBlockchainToUI(app))
+
+      console.log('✅ Fetched', pendingApps.length, 'pending applications from blockchain')
+      return pendingApps
     } catch (error) {
-      console.error('❌ Error fetching pending applications:', error)
+      console.error('❌ Error fetching pending applications from blockchain:', error)
       throw error
     }
   }
 
-  // Get specific theater application by ID
-  async getApplicationById(id: string): Promise<TheaterApplication> {
+  // Get all applications (for dashboard stats)
+  async getAllApplications(): Promise<TheaterApplication[]> {
     try {
-      console.log('📋 Fetching theater application:', id)
-      const response = await this.api.get(`/theater-requests/${id}`)
-      
-      if (!response.data.success) {
-        throw new Error(response.data.message || 'Application not found')
-      }
-      
-      console.log('✅ Application fetched successfully')
-      return response.data.data
+      console.log('📋 Fetching all theater applications from blockchain...')
+
+      await this.registryService.initialize()
+      const allApplications = await this.registryService.getAllApplications()
+
+      const uiApplications = allApplications.map(app => this.convertBlockchainToUI(app))
+
+      console.log('✅ Fetched', uiApplications.length, 'total applications from blockchain')
+      return uiApplications
     } catch (error) {
-      console.error('❌ Error fetching application:', error)
+      console.error('❌ Error fetching all applications from blockchain:', error)
       throw error
     }
   }
 
-  // Approve theater application
-  async approveApplication(id: string, adminNotes?: string): Promise<TheaterApplication> {
+  // Get specific theater application by ID from blockchain
+  async getApplicationById(applicationId: string): Promise<TheaterApplication> {
     try {
-      console.log('✅ Approving theater application:', id)
-      const response = await this.api.post(`/theater-requests/${id}/accept`, {
-        adminNotes
-      })
-      
-      if (!response.data.success) {
-        throw new Error(response.data.message || 'Failed to approve application')
+      console.log('📋 Fetching theater application from blockchain:', applicationId)
+
+      await this.registryService.initialize()
+      const app = await this.registryService.getApplicationDetails(applicationId)
+
+      if (!app) {
+        throw new Error('Application not found on blockchain')
       }
-      
-      console.log('✅ Application approved successfully')
-      return response.data.data
+
+      console.log('✅ Application fetched successfully from blockchain')
+      return this.convertBlockchainToUI(app)
     } catch (error) {
-      console.error('❌ Error approving application:', error)
+      console.error('❌ Error fetching application from blockchain:', error)
       throw error
     }
   }
 
-  // Reject theater application
-  async rejectApplication(id: string, rejectionReason: string, adminNotes?: string): Promise<TheaterApplication> {
+  // Approve theater application on blockchain
+  async approveApplication(applicationId: string, adminNotes?: string): Promise<TheaterApplication> {
     try {
-      console.log('❌ Rejecting theater application:', id)
-      const response = await this.api.post(`/theater-requests/${id}/reject`, {
-        rejectionReason,
-        adminNotes
-      })
-      
-      if (!response.data.success) {
-        throw new Error(response.data.message || 'Failed to reject application')
+      console.log('✅ Approving theater application on blockchain:', applicationId)
+
+      await this.registryService.initialize()
+
+      const txHash = await this.registryService.updateApplicationStatus(
+        applicationId,
+        ApplicationStatus.Approved,
+        adminNotes || 'Application approved by admin'
+      )
+
+      console.log('✅ Application approved on blockchain, tx:', txHash)
+
+      // Fetch updated application details
+      const updatedApp = await this.registryService.getApplicationDetails(applicationId)
+      if (!updatedApp) {
+        throw new Error('Failed to fetch updated application')
       }
-      
-      console.log('❌ Application rejected successfully')
-      return response.data.data
+
+      return this.convertBlockchainToUI(updatedApp)
     } catch (error) {
-      console.error('❌ Error rejecting application:', error)
+      console.error('❌ Error approving application on blockchain:', error)
       throw error
     }
   }
 
-  // Get admin dashboard stats
+  // Reject theater application on blockchain
+  async rejectApplication(applicationId: string, rejectionReason: string, adminNotes?: string): Promise<TheaterApplication> {
+    try {
+      console.log('❌ Rejecting theater application on blockchain:', applicationId)
+
+      await this.registryService.initialize()
+
+      const notes = `Rejection Reason: ${rejectionReason}${adminNotes ? `. Admin Notes: ${adminNotes}` : ''}`
+
+      const txHash = await this.registryService.updateApplicationStatus(
+        applicationId,
+        ApplicationStatus.Rejected,
+        notes
+      )
+
+      console.log('❌ Application rejected on blockchain, tx:', txHash)
+
+      // Fetch updated application details
+      const updatedApp = await this.registryService.getApplicationDetails(applicationId)
+      if (!updatedApp) {
+        throw new Error('Failed to fetch updated application')
+      }
+
+      return this.convertBlockchainToUI(updatedApp)
+    } catch (error) {
+      console.error('❌ Error rejecting application on blockchain:', error)
+      throw error
+    }
+  }
+
+  // Set application under review on blockchain
+  async setUnderReview(applicationId: string, adminNotes?: string): Promise<TheaterApplication> {
+    try {
+      console.log('🔍 Setting application under review on blockchain:', applicationId)
+
+      await this.registryService.initialize()
+
+      const txHash = await this.registryService.updateApplicationStatus(
+        applicationId,
+        ApplicationStatus.UnderReview,
+        adminNotes || 'Application is under review'
+      )
+
+      console.log('🔍 Application set under review on blockchain, tx:', txHash)
+
+      // Fetch updated application details
+      const updatedApp = await this.registryService.getApplicationDetails(applicationId)
+      if (!updatedApp) {
+        throw new Error('Failed to fetch updated application')
+      }
+
+      return this.convertBlockchainToUI(updatedApp)
+    } catch (error) {
+      console.error('❌ Error setting application under review on blockchain:', error)
+      throw error
+    }
+  }
+
+  // Get admin dashboard stats from blockchain
   async getDashboardStats(): Promise<AdminDashboardStats> {
     try {
-      console.log('📊 Fetching admin dashboard stats...')
-      const response = await this.api.get('/dashboard/stats')
-      
-      if (!response.data.success) {
-        throw new Error(response.data.message || 'Failed to fetch stats')
+      console.log('📊 Fetching admin dashboard stats from blockchain...')
+
+      const allApplications = await this.getAllApplications()
+
+      const stats: AdminDashboardStats = {
+        totalApplications: allApplications.length,
+        pendingApplications: allApplications.filter(app => app.status === 'pending').length,
+        approvedApplications: allApplications.filter(app => app.status === 'approved').length,
+        rejectedApplications: allApplications.filter(app => app.status === 'rejected').length,
+        underReviewApplications: allApplications.filter(app => app.status === 'under_review').length,
+        recentApplications: allApplications
+          .sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime())
+          .slice(0, 5)
       }
-      
-      console.log('✅ Dashboard stats fetched successfully')
-      return response.data.data
+
+      console.log('✅ Dashboard stats calculated from blockchain data')
+      return stats
     } catch (error) {
-      console.error('❌ Error fetching dashboard stats:', error)
+      console.error('❌ Error fetching dashboard stats from blockchain:', error)
       throw error
     }
   }
@@ -147,6 +264,30 @@ class AdminTheaterService {
   // Get IPFS PDF URL
   getIPFSUrl(hash: string): string {
     return `https://gateway.pinata.cloud/ipfs/${hash}`
+  }
+
+  // Get blockchain transaction URL (for Ganache, this would be a block explorer if available)
+  getTransactionUrl(txHash: string): string {
+    // For Ganache, you might want to implement a simple block explorer
+    // For now, just return the hash
+    return txHash
+  }
+
+  // Copy text to clipboard helper
+  async copyToClipboard(text: string, label: string = 'Text'): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(text)
+      console.log(`📋 Copied ${label} to clipboard:`, text)
+    } catch (error) {
+      console.error(`❌ Failed to copy ${label} to clipboard:`, error)
+      // Fallback for older browsers
+      const textArea = document.createElement('textarea')
+      textArea.value = text
+      document.body.appendChild(textArea)
+      textArea.select()
+      document.execCommand('copy')
+      document.body.removeChild(textArea)
+    }
   }
 }
 

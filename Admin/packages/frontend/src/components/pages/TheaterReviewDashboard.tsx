@@ -1,12 +1,12 @@
-import  { useState, useEffect } from 'react'
-import { 
-  Building2, 
-  Eye, 
-  Check, 
-  X, 
-  Clock, 
-  FileText, 
-  User, 
+import { useState, useEffect } from 'react'
+import {
+  Building2,
+  Eye,
+  Check,
+  X,
+  Clock,
+  FileText,
+  User,
   AlertCircle,
   ExternalLink,
   Loader2
@@ -31,12 +31,12 @@ export function TheaterReviewDashboard() {
   const loadData = async () => {
     try {
       setLoading(true)
-      const [pendingApps, dashboardStats] = await Promise.all([
-        adminTheaterService.getPendingApplications(),
+      const [allApps, dashboardStats] = await Promise.all([
+        adminTheaterService.getAllApplications(), // Get ALL applications, not just pending
         adminTheaterService.getDashboardStats()
       ])
-      
-      setApplications(pendingApps)
+
+      setApplications(allApps)
       setStats(dashboardStats)
     } catch (error) {
       console.error('Error loading data:', error)
@@ -54,9 +54,9 @@ export function TheaterReviewDashboard() {
     try {
       setActionLoading(true)
       await adminTheaterService.approveApplication(application.id, adminNotes)
-      
+
       alert(`✅ Theater "${application.theaterName}" has been approved successfully!`)
-      
+
       // Refresh data
       await loadData()
       setSelectedApplication(null)
@@ -78,13 +78,13 @@ export function TheaterReviewDashboard() {
     try {
       setActionLoading(true)
       await adminTheaterService.rejectApplication(
-        selectedApplication.id, 
-        rejectionReason, 
+        selectedApplication.id,
+        rejectionReason,
         adminNotes
       )
-      
+
       alert(`❌ Theater "${selectedApplication.theaterName}" has been rejected.`)
-      
+
       // Refresh data
       await loadData()
       setSelectedApplication(null)
@@ -107,6 +107,22 @@ export function TheaterReviewDashboard() {
       hour: '2-digit',
       minute: '2-digit'
     })
+  }
+
+  const getStatusBadge = (status: string) => {
+    const statusConfig = {
+      pending: { bg: 'bg-orange-500/20', text: 'text-orange-400', border: 'border-orange-500/30', label: 'Pending' },
+      approved: { bg: 'bg-green-500/20', text: 'text-green-400', border: 'border-green-500/30', label: 'Approved' },
+      rejected: { bg: 'bg-red-500/20', text: 'text-red-400', border: 'border-red-500/30', label: 'Rejected' },
+      under_review: { bg: 'bg-blue-500/20', text: 'text-blue-400', border: 'border-blue-500/30', label: 'Under Review' }
+    }
+
+    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.pending
+    return (
+      <span className={`px-2 py-1 rounded-full text-xs font-medium border ${config.bg} ${config.text} ${config.border}`}>
+        {config.label}
+      </span>
+    )
   }
 
   if (loading) {
@@ -143,7 +159,7 @@ export function TheaterReviewDashboard() {
                 <Building2 className="h-8 w-8 text-violet-400" />
               </div>
             </div>
-            
+
             <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-xl p-6">
               <div className="flex items-center justify-between">
                 <div>
@@ -153,7 +169,7 @@ export function TheaterReviewDashboard() {
                 <Clock className="h-8 w-8 text-orange-400" />
               </div>
             </div>
-            
+
             <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-xl p-6">
               <div className="flex items-center justify-between">
                 <div>
@@ -163,7 +179,7 @@ export function TheaterReviewDashboard() {
                 <Check className="h-8 w-8 text-green-400" />
               </div>
             </div>
-            
+
             <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-xl p-6">
               <div className="flex items-center justify-between">
                 <div>
@@ -179,14 +195,14 @@ export function TheaterReviewDashboard() {
         {/* Applications List */}
         <div className="bg-slate-800/30 backdrop-blur-sm border border-slate-700 rounded-xl overflow-hidden">
           <div className="px-6 py-4 border-b border-slate-700">
-            <h2 className="text-lg font-semibold text-white">Pending Applications ({applications.length})</h2>
+            <h2 className="text-lg font-semibold text-white">All Theater Applications ({applications.length})</h2>
           </div>
-          
+
           {applications.length === 0 ? (
             <div className="text-center py-12">
               <Building2 className="mx-auto h-12 w-12 text-slate-400 mb-4" />
-              <h3 className="text-lg font-medium text-white mb-2">No pending applications</h3>
-              <p className="text-slate-400">All theater applications have been reviewed</p>
+              <h3 className="text-lg font-medium text-white mb-2">No applications found</h3>
+              <p className="text-slate-400">No theater applications have been submitted yet</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -203,7 +219,10 @@ export function TheaterReviewDashboard() {
                       Location
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
-                      Details
+                      IPFS Hash
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                      Status
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
                       Submitted
@@ -235,7 +254,23 @@ export function TheaterReviewDashboard() {
                         {application.city}, {application.state}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-300">
-                        GST: {application.gstNumber}
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-xs bg-slate-700 px-2 py-1 rounded">
+                            {application.pdfHash ? `${application.pdfHash.substring(0, 12)}...` : 'N/A'}
+                          </span>
+                          {application.pdfHash && (
+                            <button
+                              onClick={() => navigator.clipboard.writeText(application.pdfHash!)}
+                              className="text-blue-400 hover:text-blue-300"
+                              title="Copy IPFS hash"
+                            >
+                              📋
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {getStatusBadge(application.status)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-400">
                         {formatDate(application.submittedAt)}
@@ -285,7 +320,7 @@ export function TheaterReviewDashboard() {
                   </button>
                 </div>
               </div>
-              
+
               <div className="p-6 space-y-6">
                 {/* Theater Details */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -304,7 +339,7 @@ export function TheaterReviewDashboard() {
                       <div><span className="text-slate-400">Amenities:</span> <span className="text-white">{selectedApplication.amenities?.join(', ') || 'None'}</span></div>
                     </div>
                   </div>
-                  
+
                   <div className="space-y-4">
                     <h4 className="text-lg font-medium text-white flex items-center gap-2">
                       <User className="h-5 w-5" />
@@ -316,9 +351,36 @@ export function TheaterReviewDashboard() {
                       <div><span className="text-slate-400">Phone:</span> <span className="text-white">{selectedApplication.ownerPhone}</span></div>
                       <div><span className="text-slate-400">GST Number:</span> <span className="text-white">{selectedApplication.gstNumber}</span></div>
                       <div><span className="text-slate-400">Submitted:</span> <span className="text-white">{formatDate(selectedApplication.submittedAt)}</span></div>
+                      <div><span className="text-slate-400">Status:</span> {getStatusBadge(selectedApplication.status)}</div>
                     </div>
                   </div>
                 </div>
+
+                {/* Blockchain Information */}
+                <div className="space-y-4">
+                  <h4 className="text-lg font-medium text-white flex items-center gap-2">
+                    <FileText className="h-5 w-5" />
+                    Blockchain Information
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                    <div><span className="text-slate-400">Application ID:</span> <span className="text-white font-mono">{selectedApplication.applicationId}</span></div>
+                    <div><span className="text-slate-400">Privy UID:</span> <span className="text-white font-mono">{selectedApplication.uid}</span></div>
+                    <div><span className="text-slate-400">Owner Wallet:</span> <span className="text-white font-mono">{selectedApplication.ownerWallet}</span></div>
+                    {selectedApplication.transactionHash && (
+                      <div><span className="text-slate-400">Transaction Hash:</span> <span className="text-white font-mono">{selectedApplication.transactionHash}</span></div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Review Notes */}
+                {selectedApplication.reviewNotes && (
+                  <div className="space-y-4">
+                    <h4 className="text-lg font-medium text-white">Review Notes</h4>
+                    <div className="bg-slate-700/50 rounded-lg p-4">
+                      <p className="text-slate-300">{selectedApplication.reviewNotes}</p>
+                    </div>
+                  </div>
+                )}
 
                 {/* PDF Preview */}
                 {selectedApplication.pdfHash && (
@@ -393,12 +455,12 @@ export function TheaterReviewDashboard() {
                   Reject Application
                 </h3>
               </div>
-              
+
               <div className="p-6 space-y-4">
                 <p className="text-slate-300">
                   Please provide a reason for rejecting "{selectedApplication?.theaterName}":
                 </p>
-                
+
                 <textarea
                   value={rejectionReason}
                   onChange={(e) => setRejectionReason(e.target.value)}
@@ -407,7 +469,7 @@ export function TheaterReviewDashboard() {
                   rows={4}
                   required
                 />
-                
+
                 <div className="flex justify-end space-x-4 pt-4">
                   <button
                     onClick={() => {
