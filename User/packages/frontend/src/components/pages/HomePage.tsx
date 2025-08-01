@@ -2,9 +2,11 @@ import { useSimpleAuth } from '../../hooks/useSimpleAuth'
 import { useLocationTheaters } from '../../hooks/useLocationTheaters'
 import { LocationFinder } from '../ui/LocationFinder'
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 
 export function HomePage() {
     const { authenticated, user } = useSimpleAuth()
+    const navigate = useNavigate()
     const { 
         theaters, 
         events, 
@@ -140,7 +142,22 @@ export function HomePage() {
                                             </div>
                                             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
                                                 {(showAllEvents ? events : events.slice(0, 3)).map((event) => (
-                                                    <div key={event.id} className="bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-xl p-6 hover:bg-slate-800/70 transition-all duration-200 cursor-pointer group">
+                                                    <div 
+                                                        key={event.id} 
+                                                        onClick={() => navigate(`/event/${event.id}`)}
+                                                        className="bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-xl p-6 hover:bg-slate-800/70 transition-all duration-200 cursor-pointer group transform hover:scale-105"
+                                                    >
+                                                        {/* Event Poster */}
+                                                        {event.imageUrl && (
+                                                            <div className="mb-4 rounded-lg overflow-hidden">
+                                                                <img 
+                                                                    src={event.imageUrl} 
+                                                                    alt={event.title}
+                                                                    className="w-full h-32 object-cover group-hover:scale-110 transition-transform duration-300"
+                                                                />
+                                                            </div>
+                                                        )}
+                                                        
                                                         <div className="flex items-start justify-between mb-4">
                                                             <div className="flex-1">
                                                                 <h3 className="text-lg font-semibold text-white mb-1 group-hover:text-violet-400 transition-colors duration-200">
@@ -171,6 +188,13 @@ export function HomePage() {
                                                             </div>
                                                             <span className="px-2 py-1 bg-violet-500/20 text-violet-300 rounded-full text-xs">
                                                                 {event.category}
+                                                            </span>
+                                                        </div>
+                                                        
+                                                        {/* Click indicator */}
+                                                        <div className="mt-4 text-center">
+                                                            <span className="text-xs text-slate-500 group-hover:text-violet-400 transition-colors duration-200">
+                                                                Click to view details →
                                                             </span>
                                                         </div>
                                                     </div>

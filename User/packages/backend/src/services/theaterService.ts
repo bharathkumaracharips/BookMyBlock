@@ -324,6 +324,7 @@ export class TheaterService {
               totalSeats: ownerEvent.totalSeats || 100,
               category: 'Movie', // Default category
               imageUrl: ownerEvent.posterUrl || undefined,
+              trailerUrl: ownerEvent.trailerUrl || undefined,
               status: ownerEvent.status === 'upcoming' ? 'active' : 
                      ownerEvent.status === 'cancelled' ? 'cancelled' : 'active'
             }
@@ -348,6 +349,7 @@ export class TheaterService {
               totalSeats: ownerEvent.totalSeats || 100,
               category: 'Movie',
               imageUrl: ownerEvent.posterUrl || undefined,
+              trailerUrl: ownerEvent.trailerUrl || undefined,
               status: ownerEvent.status === 'upcoming' ? 'active' : 
                      ownerEvent.status === 'cancelled' ? 'cancelled' : 'active'
             }

@@ -38,6 +38,7 @@ export interface Event {
   totalSeats: number
   category: string
   imageUrl?: string
+  trailerUrl?: string
   status: 'active' | 'cancelled' | 'completed'
 }
 
@@ -299,7 +300,17 @@ export class LocationService {
    */
   static async searchTheaters(query: string): Promise<Theater[]> {
     try {
-      console.log(`🔍 Searching theaters with query: ${query}`)
+      console.log(`🔍 Searching theaters with query: "${query}"`)
+      
+      // If query is empty, get all theaters
+      if (!query || query.trim() === '') {
+        const response = await this.api.get('/')
+        if (response.data.success) {
+          console.log(`✅ Found ${response.data.total} total theaters`)
+          return response.data.data
+        }
+        return []
+      }
       
       const response = await this.api.get('/search', {
         params: { q: query }
