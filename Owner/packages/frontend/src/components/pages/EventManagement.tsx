@@ -357,11 +357,13 @@ function CreateEventForm({ theater, user, onBack, onEventCreated }: {
     startDate: '',
     endDate: '',
     ticketPrice: '',
-    description: ''
+    description: '',
+    trailerUrl: ''
   })
   const [showTimes, setShowTimes] = useState<string[]>([''])
   const [posterImage, setPosterImage] = useState<File | null>(null)
   const [posterPreview, setPosterPreview] = useState<string | null>(null)
+  const [trailerPreview, setTrailerPreview] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const addShowTime = () => {
@@ -411,6 +413,40 @@ function CreateEventForm({ theater, user, onBack, onEventCreated }: {
     setPosterPreview(null)
   }
 
+  // YouTube URL validation and processing
+  const extractYouTubeVideoId = (url: string): string | null => {
+    const patterns = [
+      /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/,
+      /youtube\.com\/watch\?.*v=([^&\n?#]+)/
+    ]
+
+    for (const pattern of patterns) {
+      const match = url.match(pattern)
+      if (match) return match[1]
+    }
+    return null
+  }
+
+  const handleTrailerUrlChange = (url: string) => {
+    setFormData({ ...formData, trailerUrl: url })
+
+    if (url.trim()) {
+      const videoId = extractYouTubeVideoId(url)
+      if (videoId) {
+        setTrailerPreview(`https://www.youtube.com/embed/${videoId}`)
+      } else {
+        setTrailerPreview(null)
+      }
+    } else {
+      setTrailerPreview(null)
+    }
+  }
+
+  const isValidYouTubeUrl = (url: string): boolean => {
+    if (!url.trim()) return true // Empty is valid (optional field)
+    return extractYouTubeVideoId(url) !== null
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSubmitting(true)
@@ -435,6 +471,13 @@ function CreateEventForm({ theater, user, onBack, onEventCreated }: {
         return
       }
 
+      // Validate trailer URL if provided
+      if (formData.trailerUrl && !isValidYouTubeUrl(formData.trailerUrl)) {
+        alert('❌ Please enter a valid YouTube URL')
+        setIsSubmitting(false)
+        return
+      }
+
       const eventData: CreateEventData = {
         theaterId: theater.id,
         movieTitle: formData.movieTitle,
@@ -442,7 +485,8 @@ function CreateEventForm({ theater, user, onBack, onEventCreated }: {
         endDate: formData.endDate,
         showTimes: validShowTimes,
         ticketPrice: parseInt(formData.ticketPrice),
-        description: formData.description || undefined
+        description: formData.description || undefined,
+        trailerUrl: formData.trailerUrl || undefined
       }
 
       console.log('🎬 Creating event:', eventData)
@@ -477,7 +521,7 @@ function CreateEventForm({ theater, user, onBack, onEventCreated }: {
 
       await eventService.createEvent(eventWithIPFS)
 
-      const successMessage = `✅ Event created successfully!\n\n📄 Event IPFS Hash: ${ipfsHash}\n🔗 View Event on IPFS: ${ipfsEventService.getEventIPFSUrl(ipfsHash)}${posterHash ? `\n\n🖼️ Poster IPFS Hash: ${posterHash}\n🔗 View Poster on IPFS: ${ipfsEventService.getEventIPFSUrl(posterHash)}` : ''}\n\nYour event data${posterHash ? ' and poster' : ''} is now stored on IPFS for decentralized access.`
+      const successMessage = `✅ Event created successfully!\n\n📄 Event IPFS Hash: ${ipfsHash}\n🔗 View Event on IPFS: ${ipfsEventService.getEventIPFSUrl(ipfsHash)}${posterHash ? `\n\n🖼️ Poster IPFS Hash: ${posterHash}\n🔗 View Poster on IPFS: ${ipfsEventService.getEventIPFSUrl(posterHash)}` : ''}${eventData.trailerUrl ? `\n\n🎬 Trailer URL: ${eventData.trailerUrl}` : ''}\n\nYour event data${posterHash ? ', poster' : ''}${eventData.trailerUrl ? ', and trailer link' : ''} ${posterHash || eventData.trailerUrl ? 'are' : 'is'} now stored on IPFS for decentralized access.`
 
       alert(successMessage)
       onEventCreated?.()
@@ -593,6 +637,68 @@ function CreateEventForm({ theater, user, onBack, onEventCreated }: {
               </div>
               <p className="text-xs text-gray-500 mt-1">
                 Upload a poster image for your movie/event. This will be stored on IPFS for decentralized access.
+              </p>
+            </div>
+
+            {/* Movie Trailer URL */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Movie Trailer (Optional)
+              </label>
+              <div className="space-y-4">
+                <div>
+                  <input
+                    type="url"
+                    value={formData.trailerUrl}
+                    onChange={(e) => handleTrailerUrlChange(e.target.value)}
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${formData.trailerUrl && !isValidYouTubeUrl(formData.trailerUrl)
+                      ? 'border-red-300 bg-red-50'
+                      : 'border-gray-300'
+                      }`}
+                    placeholder="https://www.youtube.com/watch?v=..."
+                  />
+                  {formData.trailerUrl && !isValidYouTubeUrl(formData.trailerUrl) && (
+                    <p className="text-red-600 text-xs mt-1">Please enter a valid YouTube URL</p>
+                  )}
+                </div>
+
+                {/* Trailer Preview */}
+                {trailerPreview && (
+                  <div className="relative">
+                    <div className="border border-gray-300 rounded-lg p-4 bg-gray-50">
+                      <div className="aspect-video rounded-lg overflow-hidden">
+                        <iframe
+                          src={trailerPreview}
+                          title="Movie Trailer Preview"
+                          className="w-full h-full"
+                          frameBorder="0"
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                          allowFullScreen
+                        ></iframe>
+                      </div>
+                      <div className="mt-3 flex items-center justify-between">
+                        <div className="flex items-center space-x-2">
+                          <div className="w-5 h-5 bg-red-500 rounded-full flex items-center justify-center">
+                            <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 24 24">
+                              <path d="M8 5v14l11-7z" />
+                            </svg>
+                          </div>
+                          <span className="text-sm font-medium text-gray-700">Trailer preview ready</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleTrailerUrlChange('')}
+                          className="text-red-600 hover:text-red-800 text-sm font-medium"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                Add a YouTube trailer URL to showcase your movie. Supports youtube.com and youtu.be links.
               </p>
             </div>
 
@@ -830,15 +936,80 @@ function MonitorEventsTab({ events, onEventClick, onRefresh }: {
           <h2 className="text-lg font-semibold text-gray-900 mb-2">Event Monitoring</h2>
           <p className="text-gray-600">Monitor all your events across theaters</p>
         </div>
-        <button
-          onClick={onRefresh}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
-        >
-          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-          </svg>
-          <span>Refresh</span>
-        </button>
+        <div className="flex space-x-2">
+          <button
+            onClick={onRefresh}
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
+          >
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            <span>Refresh</span>
+          </button>
+          <button
+            onClick={async () => {
+              try {
+                console.log('🔄 Refreshing events from IPFS...')
+                const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/events/refresh-from-ipfs`, {
+                  method: 'POST'
+                })
+                const result = await response.json()
+                if (result.success) {
+                  alert(`✅ Successfully reloaded ${result.data.eventsLoaded} events from IPFS!`)
+                  onRefresh()
+                } else {
+                  alert('❌ Failed to refresh events from IPFS')
+                }
+              } catch (error) {
+                console.error('Error refreshing from IPFS:', error)
+                alert('❌ Error refreshing events from IPFS')
+              }
+            }}
+            className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2"
+            title="Reload events from IPFS storage"
+          >
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            <span>Sync IPFS</span>
+          </button>
+          <button
+            onClick={async () => {
+              try {
+                console.log('🧪 Testing backend connection...')
+                const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/events/test`)
+                const result = await response.json()
+                console.log('Backend test result:', result)
+                alert(`Backend Status:\n✅ Connected: ${result.success}\n📊 Events in memory: ${result.eventsInMemory}\n🔄 Initialized: ${result.isInitialized}`)
+              } catch (error) {
+                console.error('Error testing backend:', error)
+                alert('❌ Backend connection failed!')
+              }
+            }}
+            className="bg-green-600 text-white px-3 py-2 rounded-lg hover:bg-green-700 transition-colors"
+            title="Test backend connection"
+          >
+            🧪
+          </button>
+          <button
+            onClick={async () => {
+              try {
+                console.log('🔍 Debugging IPFS...')
+                const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/events/debug-ipfs`)
+                const result = await response.json()
+                console.log('Debug result:', result)
+                alert(`Debug Info:\nTotal IPFS pins: ${result.totalPins}\nCurrent events: ${result.currentEvents}\nCheck console for details`)
+              } catch (error) {
+                console.error('Error debugging IPFS:', error)
+                alert('❌ Error debugging IPFS')
+              }
+            }}
+            className="bg-gray-600 text-white px-3 py-2 rounded-lg hover:bg-gray-700 transition-colors"
+            title="Debug IPFS content"
+          >
+            🔍
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -897,6 +1068,14 @@ function MonitorEventsTab({ events, onEventClick, onRefresh }: {
                     <span>IPFS</span>
                   </a>
                 )}
+                {event.trailerUrl && (
+                  <div className="flex items-center space-x-1 text-red-600 text-xs font-medium bg-red-50 px-2 py-1 rounded-full">
+                    <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M8 5v14l11-7z" />
+                    </svg>
+                    <span>Trailer</span>
+                  </div>
+                )}
                 <span className={`px-3 py-1 rounded-full text-xs font-medium ${event.status === 'upcoming' ? 'bg-blue-100 text-blue-800' :
                   event.status === 'ongoing' ? 'bg-green-100 text-green-800' :
                     'bg-gray-100 text-gray-800'
@@ -944,6 +1123,19 @@ function EventDetailsView({ event, onBack }: {
   event: Event;
   onBack: () => void;
 }) {
+  // Extract YouTube video ID for embedding
+  const getYouTubeEmbedUrl = (url: string): string | null => {
+    const patterns = [
+      /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/,
+      /youtube\.com\/watch\?.*v=([^&\n?#]+)/
+    ]
+
+    for (const pattern of patterns) {
+      const match = url.match(pattern)
+      if (match) return `https://www.youtube.com/embed/${match[1]}`
+    }
+    return null
+  }
   return (
     <div className="min-h-screen bg-gray-50 p-6 pt-20">
       <div className="max-w-4xl mx-auto">
@@ -972,27 +1164,66 @@ function EventDetailsView({ event, onBack }: {
             )}
           </div>
 
-          {/* Movie Poster */}
-          {event.posterUrl && (
-            <div className="mb-8 flex justify-center">
-              <div className="relative group">
-                <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                <img
-                  src={event.posterUrl}
-                  alt={`${event.movieTitle} poster`}
-                  className="w-80 h-[450px] object-cover rounded-xl shadow-2xl border border-gray-200 group-hover:shadow-3xl transition-all duration-300"
-                />
-                <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                  <a
-                    href={event.posterUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="bg-white/90 backdrop-blur-sm text-gray-700 p-2 rounded-full hover:bg-white transition-colors shadow-lg"
-                    title="View full size"
-                  >
-                    <ExternalLink className="h-4 w-4" />
-                  </a>
-                </div>
+          {/* Movie Poster and Trailer */}
+          {(event.posterUrl || event.trailerUrl) && (
+            <div className="mb-8">
+              <div className={`grid gap-6 ${event.posterUrl && event.trailerUrl ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1'} justify-items-center`}>
+
+                {/* Movie Poster */}
+                {event.posterUrl && (
+                  <div className="flex justify-center">
+                    <div className="relative group">
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                      <img
+                        src={event.posterUrl}
+                        alt={`${event.movieTitle} poster`}
+                        className="w-80 h-[450px] object-cover rounded-xl shadow-2xl border border-gray-200 group-hover:shadow-3xl transition-all duration-300"
+                      />
+                      <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                        <a
+                          href={event.posterUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="bg-white/90 backdrop-blur-sm text-gray-700 p-2 rounded-full hover:bg-white transition-colors shadow-lg"
+                          title="View full size"
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                        </a>
+                      </div>
+                      <div className="absolute bottom-4 left-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                        <span className="bg-black/70 text-white text-xs px-3 py-1 rounded-full backdrop-blur-sm">
+                          Movie Poster
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Movie Trailer */}
+                {event.trailerUrl && getYouTubeEmbedUrl(event.trailerUrl) && (
+                  <div className="flex justify-center">
+                    <div className="relative group">
+                      <div className="w-80 h-[450px] rounded-xl overflow-hidden shadow-2xl border border-gray-200 group-hover:shadow-3xl transition-all duration-300">
+                        <iframe
+                          src={getYouTubeEmbedUrl(event.trailerUrl)!}
+                          title={`${event.movieTitle} Trailer`}
+                          className="w-full h-full"
+                          frameBorder="0"
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                          allowFullScreen
+                        ></iframe>
+                      </div>
+                      <div className="absolute bottom-4 left-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                        <span className="bg-red-600/80 text-white text-xs px-3 py-1 rounded-full backdrop-blur-sm flex items-center space-x-1">
+                          <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M8 5v14l11-7z" />
+                          </svg>
+                          <span>Movie Trailer</span>
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}

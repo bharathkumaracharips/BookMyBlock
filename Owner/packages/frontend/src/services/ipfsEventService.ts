@@ -20,6 +20,7 @@ interface EventIPFSData {
     description?: string
     posterHash?: string
     posterUrl?: string
+    trailerUrl?: string
     createdBy: string
     createdAt: string
     metadata: {
@@ -100,6 +101,7 @@ class IPFSEventService {
                 description: eventData.description,
                 posterHash: posterHash,
                 posterUrl: posterHash ? `https://gateway.pinata.cloud/ipfs/${posterHash}` : undefined,
+                trailerUrl: eventData.trailerUrl,
                 createdBy: userId,
                 createdAt: new Date().toISOString(),
                 metadata: {

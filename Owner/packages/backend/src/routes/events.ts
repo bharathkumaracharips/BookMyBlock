@@ -1,4 +1,5 @@
 import express from 'express'
+import axios from 'axios'
 
 const router = express.Router()
 
@@ -6,11 +7,108 @@ const router = express.Router()
 // In production, this would be replaced with database operations
 let events: any[] = []
 let eventIdCounter = 1
+let isInitialized = false
+
+// Pinata configuration for loading events from IPFS
+const PINATA_JWT = process.env.PINATA_JWT || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySW5mb3JtYXRpb24iOnsiaWQiOiIzMTAzNGUyNC0yZjdjLTRkNzItYmZmZi0yZTY0MTJmNjhkODMiLCJlbWFpbCI6ImJoYXJhdGhrdW1hcmFjaGFyaXBzQGdtYWlsLmNvbSIsImVtYWlsX3ZlcmlmaWVkIjp0cnVlLCJwaW5fcG9saWN5Ijp7InJlZ2lvbnMiOlt7ImRlc2lyZWRSZXBsaWNhdGlvbkNvdW50IjoxLCJpZCI6IkZSQTEifSx7ImRlc2lyZWRSZXBsaWNhdGlvbkNvdW50IjoxLCJpZCI6Ik5ZQzEifV0sInZlcnNpb24iOjF9LCJtZmFfZW5hYmxlZCI6ZmFsc2UsInN0YXR1cyI6IkFDVElWRSJ9LCJhdXRoZW50aWNhdGlvblR5cGUiOiJzY29wZWRLZXkiLCJzY29wZWRLZXlLZXkiOiI4MDE0MjBlZjg4ZDE0NGJiZDQxYyIsInNjb3BlZEtleVNlY3JldCI6IjE3Nzg3YzcxN2UzM2M2NTU1ZTIzNmU4YjVhNWYyYzZmOTNlZmZiOGVkNjg1OGY5MDUxYTRiZjhjMjIxNDJmZTMiLCJleHAiOjE3ODU1MjE3MTd9.ZM-VPs8f_FxJ7jzlt4tzoB3mduFkIz4EeHXFpkuheso'
+
+// Load events from IPFS on server startup
+async function loadEventsFromIPFS() {
+  if (isInitialized) {
+    console.log('⏭️ Already initialized, skipping IPFS load')
+    return
+  }
+  
+  try {
+    console.log('🔄 Starting IPFS event loading process...')
+    console.log('🔑 Using Pinata JWT (first 50 chars):', PINATA_JWT.substring(0, 50) + '...')
+    console.log('🔑 JWT from env:', process.env.PINATA_JWT ? 'Found in env' : 'Not found in env')
+    console.log('🔑 JWT length:', PINATA_JWT.length)
+    
+    const response = await axios.get('https://api.pinata.cloud/data/pinList', {
+      headers: {
+        'Authorization': `Bearer ${PINATA_JWT}`
+      },
+      params: {
+        status: 'pinned',
+        pageLimit: 100
+        // Remove metadata filtering for now to get all pins
+      }
+    })
+
+    console.log(`📡 Found ${response.data.rows.length} total pins on IPFS`)
+
+    // Load each pin and check if it's an event
+    for (const pin of response.data.rows) {
+      try {
+        console.log(`🔍 Checking pin: ${pin.ipfs_pin_hash}`)
+        
+        const eventResponse = await axios.get(`https://gateway.pinata.cloud/ipfs/${pin.ipfs_pin_hash}`)
+        const eventData = eventResponse.data
+
+        // Check if this is an event (has the required event structure)
+        if (eventData && 
+            eventData.metadata && 
+            eventData.metadata.type === 'theater_event' &&
+            eventData.movieTitle && 
+            eventData.theaterId) {
+          
+          console.log(`✅ Found event: ${eventData.movieTitle}`)
+
+          // Convert IPFS event data to backend format
+          const backendEvent = {
+            id: `event_${eventIdCounter++}`,
+            theaterId: eventData.theaterId,
+            movieTitle: eventData.movieTitle,
+            startDate: eventData.startDate,
+            endDate: eventData.endDate,
+            showTimes: eventData.showTimes || [],
+            ticketPrice: eventData.ticketPrice,
+            description: eventData.description || '',
+            ipfsHash: pin.ipfs_pin_hash,
+            ipfsUrl: `https://gateway.pinata.cloud/ipfs/${pin.ipfs_pin_hash}`,
+            posterHash: eventData.posterHash || null,
+            posterUrl: eventData.posterUrl || null,
+            trailerUrl: eventData.trailerUrl || null,
+            status: 'upcoming',
+            availableSeats: 100,
+            totalSeats: 100,
+            createdAt: eventData.createdAt || new Date().toISOString(),
+            updatedAt: eventData.createdAt || new Date().toISOString()
+          }
+
+          events.push(backendEvent)
+          console.log(`✅ Loaded event: ${eventData.movieTitle} (ID: ${backendEvent.id})`)
+        } else {
+          console.log(`⏭️ Skipping non-event pin: ${pin.ipfs_pin_hash}`)
+        }
+      } catch (eventError) {
+        console.warn(`⚠️ Failed to load/parse pin ${pin.ipfs_pin_hash}:`, eventError.message)
+      }
+    }
+
+    console.log(`✅ Successfully loaded ${events.length} events from IPFS`)
+    isInitialized = true
+  } catch (error) {
+    console.error('❌ Error loading events from IPFS:', error.message)
+    isInitialized = true // Mark as initialized even if failed to prevent retry loops
+  }
+}
+
+// Initialize events on first request
+async function ensureInitialized() {
+  if (!isInitialized) {
+    console.log('🚀 First API request - initializing events from IPFS...')
+    await loadEventsFromIPFS()
+    console.log(`📊 Initialization complete. ${events.length} events loaded.`)
+  }
+}
 
 // Create a new event
 router.post('/', async (req, res) => {
   try {
-    const { theaterId, movieTitle, startDate, endDate, showTimes, ticketPrice, description, ipfsHash, ipfsUrl, posterHash, posterUrl } = req.body
+    await ensureInitialized()
+    const { theaterId, movieTitle, startDate, endDate, showTimes, ticketPrice, description, ipfsHash, ipfsUrl, posterHash, posterUrl, trailerUrl } = req.body
 
     // Validate required fields
     if (!theaterId || !movieTitle || !startDate || !endDate || !showTimes || !ticketPrice) {
@@ -69,6 +167,7 @@ router.post('/', async (req, res) => {
       ipfsUrl: ipfsUrl || null,
       posterHash: posterHash || null,
       posterUrl: posterUrl || null,
+      trailerUrl: trailerUrl || null,
       status: 'upcoming',
       availableSeats: 100, // Default - would come from theater data
       totalSeats: 100,     // Default - would come from theater data
@@ -99,6 +198,7 @@ router.post('/', async (req, res) => {
 // Get events for a specific theater
 router.get('/theater/:theaterId', async (req, res) => {
   try {
+    await ensureInitialized()
     const { theaterId } = req.params
 
     if (!theaterId) {
@@ -129,6 +229,9 @@ router.get('/theater/:theaterId', async (req, res) => {
 // Get all events for a user (across all their theaters)
 router.get('/user', async (req, res) => {
   try {
+    console.log('📡 GET /user route called')
+    await ensureInitialized()
+    console.log(`📊 After initialization: ${events.length} events in memory`)
     const { userId } = req.query
 
     // For demo purposes, return all events
@@ -154,6 +257,7 @@ router.get('/user', async (req, res) => {
 // Update an event
 router.put('/:eventId', async (req, res) => {
   try {
+    await ensureInitialized()
     const { eventId } = req.params
     const updateData = req.body
 
@@ -193,6 +297,7 @@ router.put('/:eventId', async (req, res) => {
 // Delete an event
 router.delete('/:eventId', async (req, res) => {
   try {
+    await ensureInitialized()
     const { eventId } = req.params
 
     const eventIndex = events.findIndex(event => event.id === eventId)
@@ -225,6 +330,7 @@ router.delete('/:eventId', async (req, res) => {
 // Get event statistics
 router.get('/stats', async (req, res) => {
   try {
+    await ensureInitialized()
     const { userId } = req.query
 
     // Calculate stats from in-memory events
@@ -279,6 +385,7 @@ router.get('/stats', async (req, res) => {
 // Get event by ID
 router.get('/:eventId', async (req, res) => {
   try {
+    await ensureInitialized()
     const { eventId } = req.params
 
     const event = events.find(event => event.id === eventId)
@@ -309,6 +416,7 @@ router.get('/:eventId', async (req, res) => {
 // Cancel an event
 router.patch('/:eventId/cancel', async (req, res) => {
   try {
+    await ensureInitialized()
     const { eventId } = req.params
     const { reason } = req.body
 
@@ -342,6 +450,96 @@ router.patch('/:eventId/cancel', async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Internal server error'
+    })
+  }
+})
+
+// Test endpoint to verify backend is working
+router.get('/test', (req, res) => {
+  res.json({
+    success: true,
+    message: 'Events backend is working',
+    eventsInMemory: events.length,
+    isInitialized,
+    timestamp: new Date().toISOString()
+  })
+})
+
+// Debug endpoint to check IPFS pins
+router.get('/debug-ipfs', async (req, res) => {
+  try {
+    console.log('🔍 Debug: Checking IPFS pins...')
+    
+    const response = await axios.get('https://api.pinata.cloud/data/pinList', {
+      headers: {
+        'Authorization': `Bearer ${PINATA_JWT}`
+      },
+      params: {
+        status: 'pinned',
+        pageLimit: 10
+      }
+    })
+
+    const debugInfo = []
+    
+    for (const pin of response.data.rows.slice(0, 5)) { // Check first 5 pins
+      try {
+        const contentResponse = await axios.get(`https://gateway.pinata.cloud/ipfs/${pin.ipfs_pin_hash}`)
+        debugInfo.push({
+          hash: pin.ipfs_pin_hash,
+          metadata: pin.metadata,
+          content: contentResponse.data,
+          isEvent: contentResponse.data?.metadata?.type === 'theater_event'
+        })
+      } catch (error) {
+        debugInfo.push({
+          hash: pin.ipfs_pin_hash,
+          metadata: pin.metadata,
+          error: error.message
+        })
+      }
+    }
+
+    res.json({
+      success: true,
+      totalPins: response.data.rows.length,
+      currentEvents: events.length,
+      debugInfo
+    })
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    })
+  }
+})
+
+// Manual refresh endpoint to reload events from IPFS
+router.post('/refresh-from-ipfs', async (req, res) => {
+  try {
+    console.log('🔄 Manual refresh requested - reloading events from IPFS...')
+    
+    // Reset state
+    events = []
+    eventIdCounter = 1
+    isInitialized = false
+    
+    // Reload from IPFS
+    await loadEventsFromIPFS()
+    
+    res.json({
+      success: true,
+      message: `Successfully reloaded ${events.length} events from IPFS`,
+      data: {
+        eventsLoaded: events.length,
+        timestamp: new Date().toISOString()
+      }
+    })
+  } catch (error) {
+    console.error('❌ Error refreshing events from IPFS:', error)
+    res.status(500).json({
+      success: false,
+      message: 'Failed to refresh events from IPFS'
     })
   }
 })

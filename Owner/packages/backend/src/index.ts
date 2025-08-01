@@ -78,4 +78,5 @@ app.listen(PORT, () => {
   console.log(`🎬 Events API: http://localhost:${PORT}/api/events`)
   console.log(`📄 IPFS API: http://localhost:${PORT}/api/ipfs`)
   console.log(`👨‍💼 Admin API: http://localhost:${PORT}/api/admin`)
+  console.log(`💾 Events will be loaded from IPFS on first request`)
 })

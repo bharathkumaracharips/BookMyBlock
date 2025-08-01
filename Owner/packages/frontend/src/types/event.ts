@@ -15,6 +15,7 @@ export interface Event {
   ipfsUrl?: string
   posterHash?: string
   posterUrl?: string
+  trailerUrl?: string
   createdAt: string
   updatedAt: string
 }
@@ -31,6 +32,7 @@ export interface CreateEventData {
   ipfsUrl?: string
   posterHash?: string
   posterUrl?: string
+  trailerUrl?: string
 }
 
 export interface EventStats {
