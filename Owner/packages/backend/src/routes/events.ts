@@ -10,7 +10,7 @@ let eventIdCounter = 1
 // Create a new event
 router.post('/', async (req, res) => {
   try {
-    const { theaterId, movieTitle, startDate, endDate, showTimes, ticketPrice, description, ipfsHash, ipfsUrl } = req.body
+    const { theaterId, movieTitle, startDate, endDate, showTimes, ticketPrice, description, ipfsHash, ipfsUrl, posterHash, posterUrl } = req.body
 
     // Validate required fields
     if (!theaterId || !movieTitle || !startDate || !endDate || !showTimes || !ticketPrice) {
@@ -67,6 +67,8 @@ router.post('/', async (req, res) => {
       description: description || '',
       ipfsHash: ipfsHash || null,
       ipfsUrl: ipfsUrl || null,
+      posterHash: posterHash || null,
+      posterUrl: posterUrl || null,
       status: 'upcoming',
       availableSeats: 100, // Default - would come from theater data
       totalSeats: 100,     // Default - would come from theater data

@@ -13,6 +13,8 @@ export interface Event {
   description?: string
   ipfsHash?: string
   ipfsUrl?: string
+  posterHash?: string
+  posterUrl?: string
   createdAt: string
   updatedAt: string
 }
@@ -27,6 +29,8 @@ export interface CreateEventData {
   description?: string
   ipfsHash?: string
   ipfsUrl?: string
+  posterHash?: string
+  posterUrl?: string
 }
 
 export interface EventStats {

@@ -18,6 +18,8 @@ interface EventIPFSData {
     showTimes: string[]
     ticketPrice: number
     description?: string
+    posterHash?: string
+    posterUrl?: string
     createdBy: string
     createdAt: string
     metadata: {
@@ -38,8 +40,50 @@ class IPFSEventService {
         }
     })
 
+    // Upload image to IPFS
+    async uploadImageToIPFS(imageFile: File): Promise<string> {
+        try {
+            console.log('📤 Uploading image to IPFS:', imageFile.name)
+
+            const formData = new FormData()
+            formData.append('file', imageFile)
+
+            const response = await this.api.post('/pinning/pinFileToIPFS', formData, {
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                },
+                params: {
+                    pinataMetadata: JSON.stringify({
+                        name: `Event_Poster_${Date.now()}`,
+                        keyvalues: {
+                            type: 'event_poster',
+                            uploadedAt: new Date().toISOString()
+                        }
+                    }),
+                    pinataOptions: JSON.stringify({
+                        cidVersion: 1
+                    })
+                }
+            })
+
+            const ipfsHash = response.data.IpfsHash
+            console.log('✅ Image uploaded to IPFS successfully:', ipfsHash)
+            console.log('🔗 Image IPFS URL:', `https://gateway.pinata.cloud/ipfs/${ipfsHash}`)
+
+            return ipfsHash
+
+        } catch (error) {
+            console.error('❌ Error uploading image to IPFS:', error)
+            if (error.response) {
+                console.error('Response data:', error.response.data)
+                console.error('Response status:', error.response.status)
+            }
+            throw new Error(`Failed to upload image to IPFS: ${error.message}`)
+        }
+    }
+
     // Upload event data to IPFS as JSON
-    async uploadEventToIPFS(eventData: CreateEventData, theaterName: string, userId: string): Promise<string> {
+    async uploadEventToIPFS(eventData: CreateEventData, theaterName: string, userId: string, posterHash?: string): Promise<string> {
         try {
             console.log('📤 Uploading event to IPFS:', eventData)
 
@@ -54,6 +98,8 @@ class IPFSEventService {
                 showTimes: eventData.showTimes,
                 ticketPrice: eventData.ticketPrice,
                 description: eventData.description,
+                posterHash: posterHash,
+                posterUrl: posterHash ? `https://gateway.pinata.cloud/ipfs/${posterHash}` : undefined,
                 createdBy: userId,
                 createdAt: new Date().toISOString(),
                 metadata: {

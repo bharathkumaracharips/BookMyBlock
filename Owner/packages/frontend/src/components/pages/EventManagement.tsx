@@ -300,8 +300,8 @@ export function EventManagement({ onBackToDashboard }: EventManagementProps) {
               <button
                 onClick={() => setActiveTab('create')}
                 className={`py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'create'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                   }`}
               >
                 <div className="flex items-center space-x-2">
@@ -312,8 +312,8 @@ export function EventManagement({ onBackToDashboard }: EventManagementProps) {
               <button
                 onClick={() => setActiveTab('monitor')}
                 className={`py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'monitor'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                   }`}
               >
                 <div className="flex items-center space-x-2">
@@ -360,6 +360,8 @@ function CreateEventForm({ theater, user, onBack, onEventCreated }: {
     description: ''
   })
   const [showTimes, setShowTimes] = useState<string[]>([''])
+  const [posterImage, setPosterImage] = useState<File | null>(null)
+  const [posterPreview, setPosterPreview] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const addShowTime = () => {
@@ -376,6 +378,37 @@ function CreateEventForm({ theater, user, onBack, onEventCreated }: {
     const newShowTimes = [...showTimes]
     newShowTimes[index] = value
     setShowTimes(newShowTimes)
+  }
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        alert('Please select an image file (JPG, PNG, GIF, etc.)')
+        return
+      }
+
+      // Validate file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        alert('Image size must be less than 5MB')
+        return
+      }
+
+      setPosterImage(file)
+
+      // Create preview
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        setPosterPreview(e.target?.result as string)
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+
+  const removePosterImage = () => {
+    setPosterImage(null)
+    setPosterPreview(null)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -414,26 +447,39 @@ function CreateEventForm({ theater, user, onBack, onEventCreated }: {
 
       console.log('🎬 Creating event:', eventData)
 
-      // Step 1: Upload event data to IPFS
+      // Step 1: Upload poster image to IPFS (if provided)
+      let posterHash: string | undefined
+      if (posterImage) {
+        console.log('📤 Uploading poster image to IPFS...')
+        posterHash = await ipfsEventService.uploadImageToIPFS(posterImage)
+        console.log('✅ Poster uploaded to IPFS:', posterHash)
+      }
+
+      // Step 2: Upload event data to IPFS
       console.log('📤 Uploading event to IPFS...')
       const ipfsHash = await ipfsEventService.uploadEventToIPFS(
         eventData,
         theater.name,
-        user?.id || 'unknown'
+        user?.id || 'unknown',
+        posterHash
       )
 
       console.log('✅ Event uploaded to IPFS:', ipfsHash)
 
-      // Step 2: Create event in backend with IPFS hash
+      // Step 3: Create event in backend with IPFS hash
       const eventWithIPFS = {
         ...eventData,
         ipfsHash,
-        ipfsUrl: ipfsEventService.getEventIPFSUrl(ipfsHash)
+        ipfsUrl: ipfsEventService.getEventIPFSUrl(ipfsHash),
+        posterHash,
+        posterUrl: posterHash ? ipfsEventService.getEventIPFSUrl(posterHash) : undefined
       }
 
       await eventService.createEvent(eventWithIPFS)
 
-      alert(`✅ Event created successfully!\n\n📄 IPFS Hash: ${ipfsHash}\n🔗 View on IPFS: ${ipfsEventService.getEventIPFSUrl(ipfsHash)}\n\nYour event data is now stored on IPFS for decentralized access.`)
+      const successMessage = `✅ Event created successfully!\n\n📄 Event IPFS Hash: ${ipfsHash}\n🔗 View Event on IPFS: ${ipfsEventService.getEventIPFSUrl(ipfsHash)}${posterHash ? `\n\n🖼️ Poster IPFS Hash: ${posterHash}\n🔗 View Poster on IPFS: ${ipfsEventService.getEventIPFSUrl(posterHash)}` : ''}\n\nYour event data${posterHash ? ' and poster' : ''} is now stored on IPFS for decentralized access.`
+
+      alert(successMessage)
       onEventCreated?.()
       onBack()
     } catch (error) {
@@ -474,6 +520,80 @@ function CreateEventForm({ theater, user, onBack, onEventCreated }: {
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="Enter movie title"
               />
+            </div>
+
+            {/* Movie Poster Upload */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Movie Poster (Optional)
+              </label>
+              <div className="space-y-4">
+                {!posterPreview ? (
+                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-400 hover:bg-blue-50/50 transition-all duration-200 group">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageUpload}
+                      className="hidden"
+                      id="poster-upload"
+                    />
+                    <label
+                      htmlFor="poster-upload"
+                      className="cursor-pointer flex flex-col items-center space-y-3"
+                    >
+                      <div className="w-16 h-16 bg-gradient-to-br from-blue-100 to-purple-100 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-200">
+                        <svg className="w-8 h-8 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                      </div>
+                      <div>
+                        <span className="text-blue-600 font-semibold text-lg group-hover:text-blue-700">Upload Movie Poster</span>
+                        <p className="text-sm text-gray-500 mt-1">PNG, JPG, GIF up to 5MB</p>
+                        <p className="text-xs text-gray-400 mt-1">Recommended: 300x450px (2:3 aspect ratio)</p>
+                      </div>
+                    </label>
+                  </div>
+                ) : (
+                  <div className="relative">
+                    <div className="border-2 border-green-200 rounded-lg p-4 bg-green-50">
+                      <div className="relative group">
+                        <img
+                          src={posterPreview}
+                          alt="Poster preview"
+                          className="w-full h-64 object-cover rounded-lg shadow-md"
+                        />
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-200 rounded-lg"></div>
+                        <button
+                          type="button"
+                          onClick={removePosterImage}
+                          className="absolute top-2 right-2 bg-red-500 hover:bg-red-600 text-white p-1.5 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                          title="Remove poster"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                      <div className="mt-3 flex items-center justify-between">
+                        <div className="flex items-center space-x-2">
+                          <div className="w-5 h-5 bg-green-500 rounded-full flex items-center justify-center">
+                            <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                          </div>
+                          <span className="text-sm font-medium text-green-700">Poster ready for upload</span>
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          {posterImage && `${(posterImage.size / 1024 / 1024).toFixed(1)}MB`}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                Upload a poster image for your movie/event. This will be stored on IPFS for decentralized access.
+              </p>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -728,6 +848,32 @@ function MonitorEventsTab({ events, onEventClick, onRefresh }: {
             onClick={() => onEventClick(event)}
             className="bg-white rounded-lg shadow-sm p-6 hover:shadow-md transition-all cursor-pointer border border-gray-200 hover:border-blue-300"
           >
+            {/* Poster Image */}
+            <div className="mb-4 relative overflow-hidden rounded-lg">
+              {event.posterUrl ? (
+                <>
+                  <img
+                    src={event.posterUrl}
+                    alt={`${event.movieTitle} poster`}
+                    className="w-full h-40 object-cover transition-transform duration-300 hover:scale-105"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent"></div>
+                  <div className="absolute bottom-2 left-2">
+                    <span className="bg-black/70 text-white text-xs px-2 py-1 rounded-full backdrop-blur-sm">
+                      Movie Poster
+                    </span>
+                  </div>
+                </>
+              ) : (
+                <div className="w-full h-40 bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
+                  <div className="text-center">
+                    <Film className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                    <span className="text-sm text-gray-500 font-medium">{event.movieTitle}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
             <div className="flex items-start justify-between mb-4">
               <div className="flex-1">
                 <h3 className="text-lg font-semibold text-gray-900 mb-1">{event.movieTitle}</h3>
@@ -752,8 +898,8 @@ function MonitorEventsTab({ events, onEventClick, onRefresh }: {
                   </a>
                 )}
                 <span className={`px-3 py-1 rounded-full text-xs font-medium ${event.status === 'upcoming' ? 'bg-blue-100 text-blue-800' :
-                    event.status === 'ongoing' ? 'bg-green-100 text-green-800' :
-                      'bg-gray-100 text-gray-800'
+                  event.status === 'ongoing' ? 'bg-green-100 text-green-800' :
+                    'bg-gray-100 text-gray-800'
                   }`}>
                   {event.status.charAt(0).toUpperCase() + event.status.slice(1)}
                 </span>
@@ -826,6 +972,31 @@ function EventDetailsView({ event, onBack }: {
             )}
           </div>
 
+          {/* Movie Poster */}
+          {event.posterUrl && (
+            <div className="mb-8 flex justify-center">
+              <div className="relative group">
+                <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                <img
+                  src={event.posterUrl}
+                  alt={`${event.movieTitle} poster`}
+                  className="w-80 h-[450px] object-cover rounded-xl shadow-2xl border border-gray-200 group-hover:shadow-3xl transition-all duration-300"
+                />
+                <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                  <a
+                    href={event.posterUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="bg-white/90 backdrop-blur-sm text-gray-700 p-2 rounded-full hover:bg-white transition-colors shadow-lg"
+                    title="View full size"
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                  </a>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             {/* Event Information */}
             <div>
@@ -859,8 +1030,8 @@ function EventDetailsView({ event, onBack }: {
 
                 <div className="flex items-center space-x-3">
                   <span className={`h-3 w-3 rounded-full ${event.status === 'upcoming' ? 'bg-blue-500' :
-                      event.status === 'ongoing' ? 'bg-green-500' :
-                        'bg-gray-500'
+                    event.status === 'ongoing' ? 'bg-green-500' :
+                      'bg-gray-500'
                     }`}></span>
                   <div>
                     <p className="font-medium text-gray-900">Status</p>
