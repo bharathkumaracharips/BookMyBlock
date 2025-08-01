@@ -40,6 +40,12 @@ app.get('/api', (_req, res) => {
   })
 })
 
+// Import routes
+import theaterRoutes from './routes/theaters'
+
+// API routes
+app.use('/api/theaters', theaterRoutes)
+
 // Protected route example
 import { authenticatePrivyUser, AuthenticatedRequest } from './middleware/privy'
 

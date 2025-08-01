@@ -4,29 +4,182 @@ import { PinataService } from '../services/pinataService'
 const router = express.Router()
 
 // In-memory storage for demo (replace with database in production)
-let theaterApplications: any[] = []
-let applicationIdCounter = 1
+let theaterApplications: any[] = [
+  // Sample approved theater for testing location-based discovery - Tirupati
+  {
+    id: 'theater_app_1',
+    theaterName: 'PVR Cinemas Tirupati',
+    address: 'Kummarimitta Street, Tirupati',
+    city: 'Tirupati',
+    state: 'Andhra Pradesh',
+    pincode: '517501',
+    numberOfScreens: 1,
+    totalSeats: 200,
+    parkingSpaces: 50,
+    amenities: [],
+    ownerName: 'Theater Owner',
+    ownerEmail: 'owner@pvr.com',
+    ownerPhone: '+91-9876543210',
+    gstNumber: 'GST123456789',
+    status: 'approved',
+    submittedAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    pdfHash: 'sample_pdf_hash_123',
+    ipfsUrls: {
+      pdf: 'https://gateway.pinata.cloud/ipfs/sample_pdf_hash_123'
+    },
+    adminAction: {
+      action: 'approved',
+      adminNotes: 'Application approved for testing',
+      actionDate: new Date().toISOString(),
+      adminId: 'admin-1'
+    }
+  },
+  // Sample approved theater for Hyderabad testing
+  {
+    id: 'theater_app_2',
+    theaterName: 'INOX GVK One Mall',
+    address: 'GVK One Mall, Banjara Hills',
+    city: 'Hyderabad',
+    state: 'Telangana',
+    pincode: '500034',
+    numberOfScreens: 6,
+    totalSeats: 1200,
+    parkingSpaces: 200,
+    amenities: ['Food Court', 'Parking', 'AC'],
+    ownerName: 'INOX Management',
+    ownerEmail: 'manager@inox.com',
+    ownerPhone: '+91-9876543211',
+    gstNumber: 'GST987654321',
+    status: 'approved',
+    submittedAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    pdfHash: 'sample_pdf_hash_456',
+    ipfsUrls: {
+      pdf: 'https://gateway.pinata.cloud/ipfs/sample_pdf_hash_456'
+    },
+    adminAction: {
+      action: 'approved',
+      adminNotes: 'Premium theater approved',
+      actionDate: new Date().toISOString(),
+      adminId: 'admin-1'
+    }
+  },
+  // Another Hyderabad theater
+  {
+    id: 'theater_app_3',
+    theaterName: 'PVR Forum Sujana Mall',
+    address: 'Forum Sujana Mall, Kukatpally',
+    city: 'Hyderabad',
+    state: 'Telangana',
+    pincode: '500072',
+    numberOfScreens: 4,
+    totalSeats: 800,
+    parkingSpaces: 150,
+    amenities: ['Food Court', 'Gaming Zone'],
+    ownerName: 'PVR Management',
+    ownerEmail: 'manager@pvr.com',
+    ownerPhone: '+91-9876543212',
+    gstNumber: 'GST456789123',
+    status: 'approved',
+    submittedAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    pdfHash: 'sample_pdf_hash_789',
+    ipfsUrls: {
+      pdf: 'https://gateway.pinata.cloud/ipfs/sample_pdf_hash_789'
+    },
+    adminAction: {
+      action: 'approved',
+      adminNotes: 'Mall theater approved',
+      actionDate: new Date().toISOString(),
+      adminId: 'admin-1'
+    }
+  },
+  // Secunderabad theater (close to Hyderabad)
+  {
+    id: 'theater_app_4',
+    theaterName: 'AMB Cinemas',
+    address: 'AMB Mall, Gachibowli',
+    city: 'Hyderabad',
+    state: 'Telangana',
+    pincode: '500032',
+    numberOfScreens: 5,
+    totalSeats: 1000,
+    parkingSpaces: 300,
+    amenities: ['IMAX', 'Dolby Atmos', 'Recliner Seats'],
+    ownerName: 'AMB Management',
+    ownerEmail: 'manager@amb.com',
+    ownerPhone: '+91-9876543213',
+    gstNumber: 'GST789123456',
+    status: 'approved',
+    submittedAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    pdfHash: 'sample_pdf_hash_101',
+    ipfsUrls: {
+      pdf: 'https://gateway.pinata.cloud/ipfs/sample_pdf_hash_101'
+    },
+    adminAction: {
+      action: 'approved',
+      adminNotes: 'Premium IMAX theater approved',
+      actionDate: new Date().toISOString(),
+      adminId: 'admin-1'
+    }
+  }
+]
+let applicationIdCounter = 5
 
-// Get all pending theater applications
+// Get theater applications with optional status filter
 router.get('/theater-requests', async (req, res) => {
   try {
-    console.log('📋 Admin fetching theater requests...')
+    const { status } = req.query
+    console.log('📋 Admin fetching theater requests with status filter:', status)
     
-    // Filter pending applications
-    const pendingApplications = theaterApplications.filter(app => app.status === 'pending')
+    let filteredApplications = theaterApplications
     
-    console.log(`✅ Found ${pendingApplications.length} pending applications`)
+    // Filter by status if provided
+    if (status && typeof status === 'string') {
+      filteredApplications = theaterApplications.filter(app => app.status === status)
+    } else {
+      // Default to pending applications for backward compatibility
+      filteredApplications = theaterApplications.filter(app => app.status === 'pending')
+    }
+    
+    console.log(`✅ Found ${filteredApplications.length} applications with status: ${status || 'pending'}`)
     
     res.json({
       success: true,
-      data: pendingApplications,
-      total: pendingApplications.length
+      data: filteredApplications,
+      total: filteredApplications.length
     })
   } catch (error) {
     console.error('❌ Error fetching theater requests:', error)
     res.status(500).json({
       success: false,
       message: 'Failed to fetch theater requests',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    })
+  }
+})
+
+// Get all approved theaters (for User app)
+router.get('/approved-theaters', async (req, res) => {
+  try {
+    console.log('🎭 Fetching approved theaters for User app...')
+    
+    const approvedTheaters = theaterApplications.filter(app => app.status === 'approved')
+    
+    console.log(`✅ Found ${approvedTheaters.length} approved theaters`)
+    
+    res.json({
+      success: true,
+      data: approvedTheaters,
+      total: approvedTheaters.length
+    })
+  } catch (error) {
+    console.error('❌ Error fetching approved theaters:', error)
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch approved theaters',
       error: error instanceof Error ? error.message : 'Unknown error'
     })
   }

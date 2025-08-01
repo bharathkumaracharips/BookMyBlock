@@ -7,7 +7,7 @@ const router = express.Router()
 // In production, this would be replaced with database operations
 let events: any[] = []
 let eventIdCounter = 1
-let isInitialized = false
+let isInitialized = false // Will be initialized by loading from IPFS
 
 // Pinata configuration for loading events from IPFS
 const PINATA_JWT = process.env.PINATA_JWT || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySW5mb3JtYXRpb24iOnsiaWQiOiIzMTAzNGUyNC0yZjdjLTRkNzItYmZmZi0yZTY0MTJmNjhkODMiLCJlbWFpbCI6ImJoYXJhdGhrdW1hcmFjaGFyaXBzQGdtYWlsLmNvbSIsImVtYWlsX3ZlcmlmaWVkIjp0cnVlLCJwaW5fcG9saWN5Ijp7InJlZ2lvbnMiOlt7ImRlc2lyZWRSZXBsaWNhdGlvbkNvdW50IjoxLCJpZCI6IkZSQTEifSx7ImRlc2lyZWRSZXBsaWNhdGlvbkNvdW50IjoxLCJpZCI6Ik5ZQzEifV0sInZlcnNpb24iOjF9LCJtZmFfZW5hYmxlZCI6ZmFsc2UsInN0YXR1cyI6IkFDVElWRSJ9LCJhdXRoZW50aWNhdGlvblR5cGUiOiJzY29wZWRLZXkiLCJzY29wZWRLZXlLZXkiOiI4MDE0MjBlZjg4ZDE0NGJiZDQxYyIsInNjb3BlZEtleVNlY3JldCI6IjE3Nzg3YzcxN2UzM2M2NTU1ZTIzNmU4YjVhNWYyYzZmOTNlZmZiOGVkNjg1OGY5MDUxYTRiZjhjMjIxNDJmZTMiLCJleHAiOjE3ODU1MjE3MTd9.ZM-VPs8f_FxJ7jzlt4tzoB3mduFkIz4EeHXFpkuheso'
@@ -18,13 +18,11 @@ async function loadEventsFromIPFS() {
     console.log('⏭️ Already initialized, skipping IPFS load')
     return
   }
-  
+
   try {
     console.log('🔄 Starting IPFS event loading process...')
     console.log('🔑 Using Pinata JWT (first 50 chars):', PINATA_JWT.substring(0, 50) + '...')
-    console.log('🔑 JWT from env:', process.env.PINATA_JWT ? 'Found in env' : 'Not found in env')
-    console.log('🔑 JWT length:', PINATA_JWT.length)
-    
+
     const response = await axios.get('https://api.pinata.cloud/data/pinList', {
       headers: {
         'Authorization': `Bearer ${PINATA_JWT}`
@@ -32,65 +30,76 @@ async function loadEventsFromIPFS() {
       params: {
         status: 'pinned',
         pageLimit: 100
-        // Remove metadata filtering for now to get all pins
       }
     })
 
     console.log(`📡 Found ${response.data.rows.length} total pins on IPFS`)
 
+    // Clear existing sample events to load real ones from IPFS
+    const realEventsFromIPFS = []
+
     // Load each pin and check if it's an event
     for (const pin of response.data.rows) {
       try {
         console.log(`🔍 Checking pin: ${pin.ipfs_pin_hash}`)
-        
-        const eventResponse = await axios.get(`https://gateway.pinata.cloud/ipfs/${pin.ipfs_pin_hash}`)
+
+        const eventResponse = await axios.get(`https://gateway.pinata.cloud/ipfs/${pin.ipfs_pin_hash}`, {
+          timeout: 5000
+        })
         const eventData = eventResponse.data
 
-        // Check if this is an event (has the required event structure)
-        if (eventData && 
-            eventData.metadata && 
-            eventData.metadata.type === 'theater_event' &&
-            eventData.movieTitle && 
-            eventData.theaterId) {
-          
-          console.log(`✅ Found event: ${eventData.movieTitle}`)
+        console.log(`📄 Pin content preview:`, JSON.stringify(eventData).substring(0, 200))
+
+        // Check if this is an event - be more flexible with the structure
+        if (eventData &&
+          (eventData.movieTitle || eventData.title) &&
+          (eventData.theaterId || eventData.theater_id)) {
+
+          const movieTitle = eventData.movieTitle || eventData.title
+          const theaterId = eventData.theaterId || eventData.theater_id
+
+          console.log(`✅ Found event: ${movieTitle} for theater: ${theaterId}`)
 
           // Convert IPFS event data to backend format
           const backendEvent = {
-            id: `event_${eventIdCounter++}`,
-            theaterId: eventData.theaterId,
-            movieTitle: eventData.movieTitle,
-            startDate: eventData.startDate,
-            endDate: eventData.endDate,
-            showTimes: eventData.showTimes || [],
-            ticketPrice: eventData.ticketPrice,
-            description: eventData.description || '',
+            id: `ipfs_event_${eventIdCounter++}`,
+            theaterId: theaterId,
+            movieTitle: movieTitle,
+            startDate: eventData.startDate || eventData.start_date || new Date().toISOString().split('T')[0],
+            endDate: eventData.endDate || eventData.end_date || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+            showTimes: eventData.showTimes || eventData.show_times || ['19:00'],
+            ticketPrice: eventData.ticketPrice || eventData.ticket_price || 250,
+            description: eventData.description || `${movieTitle} - Theater Event`,
             ipfsHash: pin.ipfs_pin_hash,
             ipfsUrl: `https://gateway.pinata.cloud/ipfs/${pin.ipfs_pin_hash}`,
-            posterHash: eventData.posterHash || null,
-            posterUrl: eventData.posterUrl || null,
-            trailerUrl: eventData.trailerUrl || null,
+            posterHash: eventData.posterHash || eventData.poster_hash || null,
+            posterUrl: eventData.posterUrl || eventData.poster_url || null,
+            trailerUrl: eventData.trailerUrl || eventData.trailer_url || null,
             status: 'upcoming',
-            availableSeats: 100,
-            totalSeats: 100,
-            createdAt: eventData.createdAt || new Date().toISOString(),
-            updatedAt: eventData.createdAt || new Date().toISOString()
+            availableSeats: eventData.availableSeats || 180,
+            totalSeats: eventData.totalSeats || 200,
+            createdAt: eventData.createdAt || eventData.created_at || new Date().toISOString(),
+            updatedAt: eventData.updatedAt || eventData.updated_at || new Date().toISOString()
           }
 
-          events.push(backendEvent)
-          console.log(`✅ Loaded event: ${eventData.movieTitle} (ID: ${backendEvent.id})`)
+          realEventsFromIPFS.push(backendEvent)
+          console.log(`✅ Loaded real event from IPFS: ${movieTitle} (ID: ${backendEvent.id})`)
         } else {
           console.log(`⏭️ Skipping non-event pin: ${pin.ipfs_pin_hash}`)
         }
       } catch (eventError) {
-        console.warn(`⚠️ Failed to load/parse pin ${pin.ipfs_pin_hash}:`, eventError.message)
+        console.warn(`⚠️ Failed to load/parse pin ${pin.ipfs_pin_hash}:`, eventError)
       }
     }
 
-    console.log(`✅ Successfully loaded ${events.length} events from IPFS`)
+    // Only use real events from IPFS - no sample events
+    events = realEventsFromIPFS
+    console.log(`🎬 Loaded ${realEventsFromIPFS.length} real events from IPFS (no sample events)`)
+
+    console.log(`✅ Successfully loaded ${events.length} real events from IPFS`)
     isInitialized = true
   } catch (error) {
-    console.error('❌ Error loading events from IPFS:', error.message)
+    console.error('❌ Error loading events from IPFS:', error)
     isInitialized = true // Mark as initialized even if failed to prevent retry loops
   }
 }
@@ -336,7 +345,7 @@ router.get('/stats', async (req, res) => {
     // Calculate stats from in-memory events
     const now = new Date()
     const today = now.toISOString().split('T')[0]
-    
+
     const stats = {
       totalEvents: events.length,
       upcomingEvents: events.filter(event => {
@@ -469,7 +478,7 @@ router.get('/test', (req, res) => {
 router.get('/debug-ipfs', async (req, res) => {
   try {
     console.log('🔍 Debug: Checking IPFS pins...')
-    
+
     const response = await axios.get('https://api.pinata.cloud/data/pinList', {
       headers: {
         'Authorization': `Bearer ${PINATA_JWT}`
@@ -481,7 +490,7 @@ router.get('/debug-ipfs', async (req, res) => {
     })
 
     const debugInfo = []
-    
+
     for (const pin of response.data.rows.slice(0, 5)) { // Check first 5 pins
       try {
         const contentResponse = await axios.get(`https://gateway.pinata.cloud/ipfs/${pin.ipfs_pin_hash}`)
@@ -518,21 +527,23 @@ router.get('/debug-ipfs', async (req, res) => {
 router.post('/refresh-from-ipfs', async (req, res) => {
   try {
     console.log('🔄 Manual refresh requested - reloading events from IPFS...')
-    
-    // Reset state
+
+    // Reset state completely - no sample events, only real IPFS events
     events = []
     eventIdCounter = 1
     isInitialized = false
-    
+
     // Reload from IPFS
     await loadEventsFromIPFS()
-    
+
     res.json({
       success: true,
-      message: `Successfully reloaded ${events.length} events from IPFS`,
+      message: `Successfully loaded ${events.length} real events from IPFS`,
       data: {
         eventsLoaded: events.length,
-        timestamp: new Date().toISOString()
+        ipfsEvents: events.filter(e => e.id.startsWith('ipfs_')).length,
+        timestamp: new Date().toISOString(),
+        events: events.map(e => ({ id: e.id, title: e.movieTitle, theater: e.theaterId }))
       }
     })
   } catch (error) {

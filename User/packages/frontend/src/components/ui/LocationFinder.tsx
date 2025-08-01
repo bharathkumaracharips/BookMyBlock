@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { LocationService } from '../../services/locationService'
 
 interface City {
   name: string
@@ -15,8 +16,9 @@ interface LocationData {
   isCurrentLocation?: boolean
 }
 
-// Popular Indian cities with coordinates
+// Popular Indian cities with coordinates (organized by popularity and region)
 const INDIAN_CITIES: City[] = [
+  // Major Metro Cities (Tier 1)
   { name: 'Mumbai', state: 'Maharashtra', latitude: 19.0760, longitude: 72.8777 },
   { name: 'Delhi', state: 'Delhi', latitude: 28.7041, longitude: 77.1025 },
   { name: 'Bangalore', state: 'Karnataka', latitude: 12.9716, longitude: 77.5946 },
@@ -25,52 +27,81 @@ const INDIAN_CITIES: City[] = [
   { name: 'Kolkata', state: 'West Bengal', latitude: 22.5726, longitude: 88.3639 },
   { name: 'Pune', state: 'Maharashtra', latitude: 18.5204, longitude: 73.8567 },
   { name: 'Ahmedabad', state: 'Gujarat', latitude: 23.0225, longitude: 72.5714 },
+  
+  // Major Tier 2 Cities
   { name: 'Jaipur', state: 'Rajasthan', latitude: 26.9124, longitude: 75.7873 },
   { name: 'Surat', state: 'Gujarat', latitude: 21.1702, longitude: 72.8311 },
   { name: 'Lucknow', state: 'Uttar Pradesh', latitude: 26.8467, longitude: 80.9462 },
   { name: 'Kanpur', state: 'Uttar Pradesh', latitude: 26.4499, longitude: 80.3319 },
   { name: 'Nagpur', state: 'Maharashtra', latitude: 21.1458, longitude: 79.0882 },
   { name: 'Indore', state: 'Madhya Pradesh', latitude: 22.7196, longitude: 75.8577 },
-  { name: 'Thane', state: 'Maharashtra', latitude: 19.2183, longitude: 72.9781 },
   { name: 'Bhopal', state: 'Madhya Pradesh', latitude: 23.2599, longitude: 77.4126 },
+  { name: 'Chandigarh', state: 'Chandigarh', latitude: 30.7333, longitude: 76.7794 },
+  
+  // Andhra Pradesh & Telangana
+  { name: 'Tirupati', state: 'Andhra Pradesh', latitude: 13.6288, longitude: 79.4192 },
   { name: 'Visakhapatnam', state: 'Andhra Pradesh', latitude: 17.6868, longitude: 83.2185 },
-  { name: 'Pimpri-Chinchwad', state: 'Maharashtra', latitude: 18.6298, longitude: 73.7997 },
-  { name: 'Patna', state: 'Bihar', latitude: 25.5941, longitude: 85.1376 },
-  { name: 'Vadodara', state: 'Gujarat', latitude: 22.3072, longitude: 73.1812 },
-  { name: 'Ghaziabad', state: 'Uttar Pradesh', latitude: 28.6692, longitude: 77.4538 },
-  { name: 'Ludhiana', state: 'Punjab', latitude: 30.9010, longitude: 75.8573 },
-  { name: 'Agra', state: 'Uttar Pradesh', latitude: 27.1767, longitude: 78.0081 },
+  { name: 'Vijayawada', state: 'Andhra Pradesh', latitude: 16.5062, longitude: 80.6480 },
+  { name: 'Guntur', state: 'Andhra Pradesh', latitude: 16.3067, longitude: 80.4365 },
+  { name: 'Nellore', state: 'Andhra Pradesh', latitude: 14.4426, longitude: 79.9865 },
+  { name: 'Kurnool', state: 'Andhra Pradesh', latitude: 15.8281, longitude: 78.0373 },
+  { name: 'Kadapa', state: 'Andhra Pradesh', latitude: 14.4673, longitude: 78.8242 },
+  { name: 'Rajahmundry', state: 'Andhra Pradesh', latitude: 17.0005, longitude: 81.8040 },
+  { name: 'Warangal', state: 'Telangana', latitude: 17.9689, longitude: 79.5941 },
+  
+  // Karnataka
+  { name: 'Mysore', state: 'Karnataka', latitude: 12.2958, longitude: 76.6394 },
+  { name: 'Hubli-Dharwad', state: 'Karnataka', latitude: 15.3647, longitude: 75.1240 },
+  
+  // Tamil Nadu
+  { name: 'Coimbatore', state: 'Tamil Nadu', latitude: 11.0168, longitude: 76.9558 },
+  { name: 'Madurai', state: 'Tamil Nadu', latitude: 9.9252, longitude: 78.1198 },
+  { name: 'Salem', state: 'Tamil Nadu', latitude: 11.664, longitude: 78.146 },
+  
+  // Maharashtra
+  { name: 'Thane', state: 'Maharashtra', latitude: 19.2183, longitude: 72.9781 },
   { name: 'Nashik', state: 'Maharashtra', latitude: 19.9975, longitude: 73.7898 },
-  { name: 'Faridabad', state: 'Haryana', latitude: 28.4089, longitude: 77.3178 },
-  { name: 'Meerut', state: 'Uttar Pradesh', latitude: 28.9845, longitude: 77.7064 },
-  { name: 'Rajkot', state: 'Gujarat', latitude: 22.3039, longitude: 70.8022 },
+  { name: 'Aurangabad', state: 'Maharashtra', latitude: 19.8762, longitude: 75.3433 },
+  { name: 'Solapur', state: 'Maharashtra', latitude: 17.6599, longitude: 75.9064 },
+  { name: 'Pimpri-Chinchwad', state: 'Maharashtra', latitude: 18.6298, longitude: 73.7997 },
   { name: 'Kalyan-Dombivli', state: 'Maharashtra', latitude: 19.2403, longitude: 73.1305 },
   { name: 'Vasai-Virar', state: 'Maharashtra', latitude: 19.4912, longitude: 72.8054 },
-  { name: 'Varanasi', state: 'Uttar Pradesh', latitude: 25.3176, longitude: 82.9739 },
-  { name: 'Srinagar', state: 'Jammu and Kashmir', latitude: 34.0837, longitude: 74.7973 },
-  { name: 'Aurangabad', state: 'Maharashtra', latitude: 19.8762, longitude: 75.3433 },
-  { name: 'Dhanbad', state: 'Jharkhand', latitude: 23.7957, longitude: 86.4304 },
-  { name: 'Amritsar', state: 'Punjab', latitude: 31.6340, longitude: 74.8723 },
   { name: 'Navi Mumbai', state: 'Maharashtra', latitude: 19.0330, longitude: 73.0297 },
+  
+  // Gujarat
+  { name: 'Vadodara', state: 'Gujarat', latitude: 22.3072, longitude: 73.1812 },
+  { name: 'Rajkot', state: 'Gujarat', latitude: 22.3039, longitude: 70.8022 },
+  
+  // Uttar Pradesh
+  { name: 'Agra', state: 'Uttar Pradesh', latitude: 27.1767, longitude: 78.0081 },
+  { name: 'Varanasi', state: 'Uttar Pradesh', latitude: 25.3176, longitude: 82.9739 },
+  { name: 'Meerut', state: 'Uttar Pradesh', latitude: 28.9845, longitude: 77.7064 },
+  { name: 'Ghaziabad', state: 'Uttar Pradesh', latitude: 28.6692, longitude: 77.4538 },
   { name: 'Allahabad', state: 'Uttar Pradesh', latitude: 25.4358, longitude: 81.8463 },
+  { name: 'Bareilly', state: 'Uttar Pradesh', latitude: 28.3670, longitude: 79.4304 },
+  
+  // Other States
+  { name: 'Patna', state: 'Bihar', latitude: 25.5941, longitude: 85.1376 },
+  { name: 'Ludhiana', state: 'Punjab', latitude: 30.9010, longitude: 75.8573 },
+  { name: 'Amritsar', state: 'Punjab', latitude: 31.6340, longitude: 74.8723 },
+  { name: 'Faridabad', state: 'Haryana', latitude: 28.4089, longitude: 77.3178 },
+  { name: 'Srinagar', state: 'Jammu and Kashmir', latitude: 34.0837, longitude: 74.7973 },
+  { name: 'Dhanbad', state: 'Jharkhand', latitude: 23.7957, longitude: 86.4304 },
   { name: 'Ranchi', state: 'Jharkhand', latitude: 23.3441, longitude: 85.3096 },
   { name: 'Howrah', state: 'West Bengal', latitude: 22.5958, longitude: 88.2636 },
-  { name: 'Coimbatore', state: 'Tamil Nadu', latitude: 11.0168, longitude: 76.9558 },
   { name: 'Jabalpur', state: 'Madhya Pradesh', latitude: 23.1815, longitude: 79.9864 },
   { name: 'Gwalior', state: 'Madhya Pradesh', latitude: 26.2183, longitude: 78.1828 },
-  { name: 'Vijayawada', state: 'Andhra Pradesh', latitude: 16.5062, longitude: 80.6480 },
   { name: 'Jodhpur', state: 'Rajasthan', latitude: 26.2389, longitude: 73.0243 },
-  { name: 'Madurai', state: 'Tamil Nadu', latitude: 9.9252, longitude: 78.1198 },
-  { name: 'Raipur', state: 'Chhattisgarh', latitude: 21.2514, longitude: 81.6296 },
   { name: 'Kota', state: 'Rajasthan', latitude: 25.2138, longitude: 75.8648 },
-  { name: 'Chandigarh', state: 'Chandigarh', latitude: 30.7333, longitude: 76.7794 },
-  { name: 'Guwahati', state: 'Assam', latitude: 26.1445, longitude: 91.7362 },
-  { name: 'Solapur', state: 'Maharashtra', latitude: 17.6599, longitude: 75.9064 },
-  { name: 'Hubli-Dharwad', state: 'Karnataka', latitude: 15.3647, longitude: 75.1240 },
-  { name: 'Bareilly', state: 'Uttar Pradesh', latitude: 28.3670, longitude: 79.4304 }
+  { name: 'Raipur', state: 'Chhattisgarh', latitude: 21.2514, longitude: 81.6296 },
+  { name: 'Guwahati', state: 'Assam', latitude: 26.1445, longitude: 91.7362 }
 ]
 
-export function LocationFinder() {
+interface LocationFinderProps {
+  onLocationChange?: (location: LocationData) => void
+}
+
+export function LocationFinder({ onLocationChange }: LocationFinderProps = {}) {
   const [selectedLocation, setSelectedLocation] = useState<LocationData | null>(null)
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
@@ -95,60 +126,47 @@ export function LocationFinder() {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  // Get current location using HTML5 Geolocation
-  const getCurrentLocation = () => {
-    if (!navigator.geolocation) {
-      return
-    }
-
+  // Get current location using LocationService
+  const getCurrentLocation = async () => {
     setLoading(true)
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const { latitude, longitude } = position.coords
-
-        try {
-          const response = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`)
-          const data = await response.json()
-
-          setSelectedLocation({
-            latitude,
-            longitude,
-            city: data.city || data.locality || 'Current Location',
-            state: data.principalSubdivision || 'India',
-            isCurrentLocation: true
-          })
-        } catch (error) {
-          setSelectedLocation({
-            latitude,
-            longitude,
-            city: 'Current Location',
-            isCurrentLocation: true
-          })
-        }
-
-        setLoading(false)
+    
+    try {
+      const location = await LocationService.getCurrentLocation()
+      
+      if (location) {
+        setSelectedLocation(location)
+        onLocationChange?.(location)
         setIsDropdownOpen(false)
-      },
-      () => {
-        setLoading(false)
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 300000
       }
-    )
+    } catch (error) {
+      console.error('Error getting current location:', error)
+    } finally {
+      setLoading(false)
+    }
   }
 
   // Select a city from the list
-  const selectCity = (city: City) => {
-    setSelectedLocation({
+  const selectCity = async (city: City) => {
+    const locationData: LocationData = {
       latitude: city.latitude,
       longitude: city.longitude,
       city: city.name,
       state: city.state,
       isCurrentLocation: false
-    })
+    }
+
+    // Try to get pincode for the city
+    try {
+      const pincode = await LocationService.getPincodeFromCity(city.name)
+      if (pincode) {
+        locationData.pincode = pincode
+      }
+    } catch (error) {
+      console.warn('Could not get pincode for city:', city.name)
+    }
+
+    setSelectedLocation(locationData)
+    onLocationChange?.(locationData)
     setIsDropdownOpen(false)
     setSearchQuery('')
   }
