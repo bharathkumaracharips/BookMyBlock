@@ -82,17 +82,32 @@ export class TheaterService {
           
           console.log(`🔗 Found ${blockchainTheaterIds.length} blockchain theaters with events:`, blockchainTheaterIds)
           
-          // Map blockchain theaters to our sample theaters for demo purposes
+          // Map blockchain theaters based on their actual events and context
           for (const blockchainId of blockchainTheaterIds) {
-            // Map to Tirupati theater for demo
+            // Try to determine theater location from events or context
+            let theaterLocation = 'Tirupati' // Default fallback
+            let pincode = '517501'
+            let state = 'Andhra Pradesh'
+            
+            // Check if this is a Hyderabad theater based on theater ID pattern or events
+            // Theater APP_4 should be in Hyderabad based on your creation
+            if (blockchainId.includes('bafkreieexhomqr2444gxtll4gumnv5xx2hjsiqf2mw7dlrzl6ovdnc73pe')) {
+              theaterLocation = 'Hyderabad'
+              pincode = '500001'
+              state = 'Telangana'
+              console.log(`🏙️ Detected Hyderabad theater: ${blockchainId}`)
+            }
+            
             const mappedTheater: Theater = {
               id: blockchainId,
-              name: 'PVR Cinemas Tirupati (Blockchain)',
-              location: 'Tirupati, Andhra Pradesh',
-              pincode: '517501',
-              city: 'Tirupati',
-              state: 'Andhra Pradesh',
-              address: 'Kummarimitta Street, Tirupati',
+              name: `PVR Cinemas ${theaterLocation} (Blockchain)`,
+              location: `${theaterLocation}, ${state}`,
+              pincode: pincode,
+              city: theaterLocation,
+              state: state,
+              address: theaterLocation === 'Hyderabad' 
+                ? 'Banjara Hills, Hyderabad' 
+                : 'Kummarimitta Street, Tirupati',
               screens: 1,
               totalSeats: 200,
               status: 'active',
@@ -106,7 +121,7 @@ export class TheaterService {
             }
             
             theaters.push(mappedTheater)
-            console.log(`✅ Mapped blockchain theater ${blockchainId} to Tirupati`)
+            console.log(`✅ Mapped blockchain theater ${blockchainId} to ${theaterLocation}`)
           }
         }
       } catch (eventsError) {

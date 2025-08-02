@@ -1,5 +1,5 @@
 import express from 'express'
-import { PinataService } from '../services/pinataService'
+// import { PinataService } from '../services/pinataService'
 
 const router = express.Router()
 

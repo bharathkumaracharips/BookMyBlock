@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { LocationService } from '../../services/locationService'
+import { useLocationContext } from '../../contexts/LocationContext'
 
 interface City {
   name: string
@@ -99,14 +100,23 @@ const INDIAN_CITIES: City[] = [
 
 interface LocationFinderProps {
   onLocationChange?: (location: LocationData) => void
+  showInNavbar?: boolean
 }
 
-export function LocationFinder({ onLocationChange }: LocationFinderProps = {}) {
-  const [selectedLocation, setSelectedLocation] = useState<LocationData | null>(null)
+export function LocationFinder({ onLocationChange, showInNavbar = false }: LocationFinderProps = {}) {
+  const { userLocation, setUserLocation: setGlobalLocation } = useLocationContext()
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [loading, setLoading] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
+
+  // Use global location as the selected location
+  const selectedLocation = userLocation
+
+  // Debug: Log when location changes
+  useEffect(() => {
+    console.log('🎯 LocationFinder received location update:', selectedLocation)
+  }, [selectedLocation])
 
   // Filter cities based on search query
   const filteredCities = INDIAN_CITIES.filter(city =>
@@ -126,21 +136,44 @@ export function LocationFinder({ onLocationChange }: LocationFinderProps = {}) {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  // Get current location using LocationService
-  const getCurrentLocation = async () => {
+  // Debug: Log when userLocation changes
+  useEffect(() => {
+    console.log('🔍 LocationFinder: userLocation changed to:', JSON.stringify(userLocation))
+  }, [userLocation])
+
+  // Refresh location detection
+  const refreshLocation = async () => {
+    console.log('🔄 LocationFinder: Refreshing location...')
     setLoading(true)
     
     try {
-      const location = await LocationService.getCurrentLocation()
+      const location = await LocationService.getCurrentLocation('LocationFinder-Refresh')
+      
+      console.log('🔄 LocationFinder: LocationService returned:', JSON.stringify(location))
       
       if (location) {
-        setSelectedLocation(location)
-        onLocationChange?.(location)
+        console.log('✅ LocationFinder: Location refreshed:', JSON.stringify(location))
+        console.log('🔄 LocationFinder: About to call setGlobalLocation...')
+        console.log('🔄 LocationFinder: Current userLocation before update:', JSON.stringify(userLocation))
+        
+        setGlobalLocation(location)
+        
+        console.log('🔄 LocationFinder: setGlobalLocation called')
+        
+        if (onLocationChange) {
+          console.log('🔄 LocationFinder: Calling onLocationChange callback')
+          onLocationChange(location)
+        }
+        
         setIsDropdownOpen(false)
+        console.log('✅ LocationFinder: Refresh completed successfully')
+      } else {
+        console.log('❌ LocationFinder: Could not refresh location - LocationService returned null')
       }
     } catch (error) {
-      console.error('Error getting current location:', error)
+      console.error('❌ LocationFinder: Error refreshing location:', error)
     } finally {
+      console.log('🔄 LocationFinder: Setting loading to false')
       setLoading(false)
     }
   }
@@ -165,7 +198,8 @@ export function LocationFinder({ onLocationChange }: LocationFinderProps = {}) {
       console.warn('Could not get pincode for city:', city.name)
     }
 
-    setSelectedLocation(locationData)
+    // Update both global and local state
+    setGlobalLocation(locationData)
     onLocationChange?.(locationData)
     setIsDropdownOpen(false)
     setSearchQuery('')
@@ -173,7 +207,7 @@ export function LocationFinder({ onLocationChange }: LocationFinderProps = {}) {
 
   // Clear selection
   const clearSelection = () => {
-    setSelectedLocation(null)
+    setGlobalLocation({ latitude: 0, longitude: 0, city: '', state: '' })
     setSearchQuery('')
   }
 
@@ -188,7 +222,7 @@ export function LocationFinder({ onLocationChange }: LocationFinderProps = {}) {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
           </svg>
-          <span className="text-sm font-medium whitespace-nowrap">Select City</span>
+          <span className={`font-medium whitespace-nowrap ${showInNavbar ? 'text-xs' : 'text-sm'}`}>Select City</span>
           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
           </svg>
@@ -201,10 +235,10 @@ export function LocationFinder({ onLocationChange }: LocationFinderProps = {}) {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
           </svg>
           <div className="flex flex-col">
-            <span className="text-sm font-medium text-white whitespace-nowrap">
+            <span className={`font-medium text-white whitespace-nowrap ${showInNavbar ? 'text-xs' : 'text-sm'}`}>
               {selectedLocation.city}
             </span>
-            {selectedLocation.state && (
+            {selectedLocation.state && !showInNavbar && (
               <span className="text-xs text-slate-400">
                 {selectedLocation.state}
               </span>
@@ -225,6 +259,33 @@ export function LocationFinder({ onLocationChange }: LocationFinderProps = {}) {
       {isDropdownOpen && (
         <div className="absolute top-full left-0 mt-2 w-80 bg-slate-800 border border-slate-600 rounded-xl shadow-2xl backdrop-blur-xl z-50">
           {/* Search Input */}
+          {/* Debug Info */}
+          <div className="p-2 border-b border-slate-600 bg-slate-800">
+            <div className="text-xs text-slate-400">
+              <div>🔍 Debug Info:</div>
+              <div>Global Location: {userLocation ? `${userLocation.city}, ${userLocation.state}` : 'None'}</div>
+              <div>Pincode: {userLocation?.pincode || 'None'}</div>
+              <div>Is Current: {userLocation?.isCurrentLocation ? 'Yes' : 'No'}</div>
+            </div>
+            <button
+              onClick={() => {
+                console.log('🧪 Manual test: Setting Hyderabad location directly')
+                const testLocation = {
+                  latitude: 17.492075993652314,
+                  longitude: 78.39881388343171,
+                  city: 'Hyderabad',
+                  state: 'Telangana',
+                  pincode: '500001',
+                  isCurrentLocation: true
+                }
+                setGlobalLocation(testLocation)
+              }}
+              className="mt-2 px-2 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
+            >
+              🧪 Force Set Hyderabad
+            </button>
+          </div>
+
           <div className="p-4 border-b border-slate-600">
             <div className="relative">
               <svg className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -241,29 +302,46 @@ export function LocationFinder({ onLocationChange }: LocationFinderProps = {}) {
             </div>
           </div>
 
-          {/* Current Location Option */}
-          <div className="p-2 border-b border-slate-600">
-            <button
-              onClick={getCurrentLocation}
-              disabled={loading}
-              className="w-full flex items-center space-x-3 px-3 py-2 text-left hover:bg-slate-700 rounded-lg transition-colors duration-200 group"
-            >
-              {loading ? (
-                <div className="w-4 h-4 border-2 border-slate-600 border-t-violet-500 rounded-full animate-spin"></div>
-              ) : (
-                <svg className="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                </svg>
-              )}
-              <div>
-                <div className="text-sm font-medium text-white">
-                  {loading ? 'Finding your location...' : 'Use current location'}
-                </div>
-                <div className="text-xs text-slate-400">
-                  Automatically detect your city
-                </div>
+          {/* Auto-detection Status */}
+          <div className="p-3 border-b border-slate-600 bg-slate-800/50">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                {userLocation?.isCurrentLocation ? (
+                  <>
+                    <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                    <span className="text-sm text-green-400">Location auto-detected</span>
+                  </>
+                ) : (
+                  <>
+                    <div className="w-2 h-2 bg-amber-400 rounded-full"></div>
+                    <span className="text-sm text-amber-400">Select your city below</span>
+                  </>
+                )}
               </div>
-            </button>
+              
+              {/* Refresh button */}
+              <button
+                onClick={refreshLocation}
+                disabled={loading}
+                className="text-xs text-slate-400 hover:text-violet-400 transition-colors duration-200 flex items-center space-x-1"
+              >
+                {loading ? (
+                  <div className="w-3 h-3 border border-slate-600 border-t-violet-500 rounded-full animate-spin"></div>
+                ) : (
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                )}
+                <span>Refresh</span>
+              </button>
+            </div>
+            
+            {userLocation?.isCurrentLocation && (
+              <div className="text-xs text-slate-400 mt-2">
+                Currently showing content for {userLocation.city}
+                {userLocation.state && `, ${userLocation.state}`}
+              </div>
+            )}
           </div>
 
           {/* Cities List */}

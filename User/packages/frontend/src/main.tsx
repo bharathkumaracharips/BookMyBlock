@@ -2,6 +2,7 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { AppProviders } from './providers/PrivyProvider'
+import { LocationProvider } from './contexts/LocationContext'
 import { Navbar } from './components/layout/Navbar'
 import { HomePage } from './components/pages/HomePage'
 import { EventDetailsPage } from './components/pages/EventDetailsPage'
@@ -11,14 +12,16 @@ import './index.css'
 function App() {
   return (
     <BrowserRouter>
-      <div className="min-h-screen">
-        <PrivyDebug />
-        <Navbar />
-        <Routes>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/event/:eventId" element={<EventDetailsPage />} />
-        </Routes>
-      </div>
+      <LocationProvider>
+        <div className="min-h-screen">
+          <PrivyDebug />
+          <Navbar />
+          <Routes>
+            <Route path="/" element={<HomePage />} />
+            <Route path="/event/:eventId" element={<EventDetailsPage />} />
+          </Routes>
+        </div>
+      </LocationProvider>
     </BrowserRouter>
   )
 }

@@ -1,21 +1,20 @@
 import { useState, useEffect } from 'react'
 import { LocationService, Theater, Event, LocationData } from '../services/locationService'
+import { useLocationContext } from '../contexts/LocationContext'
 
 export interface UseLocationTheatersReturn {
   theaters: Theater[]
   events: Event[]
-  userLocation: LocationData | null
   loading: boolean
   error: string | null
   refreshData: () => Promise<void>
-  setUserLocation: (location: LocationData) => void
   searchTheaters: (query: string) => Promise<Theater[]>
 }
 
 export function useLocationTheaters(): UseLocationTheatersReturn {
+  const { userLocation } = useLocationContext()
   const [theaters, setTheaters] = useState<Theater[]>([])
   const [events, setEvents] = useState<Event[]>([])
-  const [userLocation, setUserLocationState] = useState<LocationData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -66,13 +65,6 @@ export function useLocationTheaters(): UseLocationTheatersReturn {
     }
   }
 
-  // Set user location and reload data
-  const setUserLocation = async (location: LocationData) => {
-    console.log('📍 User location updated:', location)
-    setUserLocationState(location)
-    await loadLocationData(location)
-  }
-
   // Refresh current data
   const refreshData = async () => {
     console.log('🔄 Refreshing location data...')
@@ -90,42 +82,17 @@ export function useLocationTheaters(): UseLocationTheatersReturn {
     }
   }
 
-  // Try to get user's current location on mount
+  // Load data when location changes
   useEffect(() => {
-    const initializeLocation = async () => {
-      try {
-        console.log('🌍 Initializing user location...')
-        
-        // Try to get current location
-        const currentLocation = await LocationService.getCurrentLocation()
-        
-        if (currentLocation) {
-          console.log('✅ Current location detected:', currentLocation)
-          setUserLocationState(currentLocation)
-          await loadLocationData(currentLocation)
-        } else {
-          console.log('📍 No location detected, loading all theaters...')
-          await loadLocationData(null)
-        }
-        
-      } catch (err) {
-        console.error('❌ Error initializing location:', err)
-        setError('Failed to detect your location')
-        await loadLocationData(null)
-      }
-    }
-
-    initializeLocation()
-  }, [])
+    loadLocationData(userLocation)
+  }, [userLocation])
 
   return {
     theaters,
     events,
-    userLocation,
     loading,
     error,
     refreshData,
-    setUserLocation,
     searchTheaters
   }
 }

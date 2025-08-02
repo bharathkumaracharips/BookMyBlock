@@ -60,29 +60,33 @@ export class LocationService {
   /**
    * Get user's current location using HTML5 Geolocation
    */
-  static async getCurrentLocation(): Promise<LocationData | null> {
+  static async getCurrentLocation(caller?: string): Promise<LocationData | null> {
+    const callerId = caller || 'unknown'
+    console.log(`🌍 LocationService.getCurrentLocation called by: ${callerId}`)
+    
     return new Promise((resolve) => {
       if (!navigator.geolocation) {
-        console.warn('⚠️ Geolocation is not supported by this browser')
+        console.warn(`⚠️ [${callerId}] Geolocation is not supported by this browser`)
         resolve(null)
         return
       }
 
+      // First try to get cached position if available
       navigator.geolocation.getCurrentPosition(
         async (position) => {
           const { latitude, longitude } = position.coords
 
           try {
-            console.log('🌍 Getting location details for coordinates:', { latitude, longitude })
+            console.log(`🌍 [${callerId}] Getting location details for coordinates:`, { latitude, longitude })
             
             // Try multiple geocoding services for better pincode detection
             const locationData = await this.getLocationFromCoordinates(latitude, longitude)
             
-            console.log('✅ Current location detected:', locationData)
+            console.log(`✅ [${callerId}] Current location detected:`, locationData)
             resolve(locationData)
 
           } catch (error) {
-            console.error('❌ Error getting location details:', error)
+            console.error(`❌ [${callerId}] Error getting location details:`, error)
             resolve({
               latitude,
               longitude,
@@ -92,13 +96,37 @@ export class LocationService {
           }
         },
         (error) => {
-          console.error('❌ Error getting current location:', error)
-          resolve(null)
+          console.warn(`⚠️ [${callerId}] Geolocation failed (${error.message}), trying with cached position...`)
+          
+          // Try again with less strict options
+          navigator.geolocation.getCurrentPosition(
+            async (position) => {
+              const { latitude, longitude } = position.coords
+              try {
+                console.log(`🌍 [${callerId}] Got cached location:`, { latitude, longitude })
+                const locationData = await this.getLocationFromCoordinates(latitude, longitude)
+                console.log(`✅ [${callerId}] Cached location processed:`, locationData)
+                resolve(locationData)
+              } catch (err) {
+                console.error(`❌ [${callerId}] Error processing cached location:`, err)
+                resolve(null)
+              }
+            },
+            (secondError) => {
+              console.error(`❌ [${callerId}] All geolocation attempts failed:`, secondError)
+              resolve(null)
+            },
+            {
+              enableHighAccuracy: false,
+              timeout: 5000,
+              maximumAge: 600000 // Accept 10-minute old position
+            }
+          )
         },
         {
           enableHighAccuracy: true,
-          timeout: 10000,
-          maximumAge: 300000
+          timeout: 8000,
+          maximumAge: 300000 // Accept 5-minute old position
         }
       )
     })
