@@ -203,6 +203,54 @@ export function TheaterDashboard() {
         </div>
       </div>
 
+      {/* Management Section */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div className="bg-gradient-to-br from-violet-500 to-purple-600 p-6 rounded-xl shadow-lg text-white">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="text-lg font-semibold">Seat Layout Management</h3>
+              <p className="text-violet-100 text-sm">Configure seat categories and pricing</p>
+            </div>
+            <Settings className="h-8 w-8 text-violet-200" />
+          </div>
+          <a
+            href="/seat-layout"
+            className="inline-flex items-center space-x-2 bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg transition-colors duration-200"
+          >
+            <Settings className="h-4 w-4" />
+            <span>Manage Layouts</span>
+          </a>
+        </div>
+
+        <div className="bg-gradient-to-br from-emerald-500 to-teal-600 p-6 rounded-xl shadow-lg text-white">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="text-lg font-semibold">Event Management</h3>
+              <p className="text-emerald-100 text-sm">Create and manage events</p>
+            </div>
+            <Calendar className="h-8 w-8 text-emerald-200" />
+          </div>
+          <button className="inline-flex items-center space-x-2 bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg transition-colors duration-200">
+            <Plus className="h-4 w-4" />
+            <span>Coming Soon</span>
+          </button>
+        </div>
+
+        <div className="bg-gradient-to-br from-amber-500 to-orange-600 p-6 rounded-xl shadow-lg text-white">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="text-lg font-semibold">Analytics</h3>
+              <p className="text-amber-100 text-sm">View performance metrics</p>
+            </div>
+            <Eye className="h-8 w-8 text-amber-200" />
+          </div>
+          <button className="inline-flex items-center space-x-2 bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg transition-colors duration-200">
+            <Eye className="h-4 w-4" />
+            <span>Coming Soon</span>
+          </button>
+        </div>
+      </div>
+
       {/* Theaters List */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100">
         <div className="px-6 py-4 border-b border-gray-100">

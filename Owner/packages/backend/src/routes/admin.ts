@@ -264,4 +264,143 @@ router.get('/dashboard/stats', async (req, res) => {
   }
 })
 
+// In-memory storage for seat layouts (replace with database in production)
+let seatLayouts: any[] = []
+
+// Get all theaters for an owner (for seat layout management)
+router.get('/theaters/owner/:ownerEmail', async (req, res) => {
+  try {
+    const { ownerEmail } = req.params
+    
+    console.log('📋 Getting theaters for owner:', ownerEmail)
+    console.log('📋 Total theater applications:', theaterApplications.length)
+    console.log('📋 All theater applications:', theaterApplications.map(app => ({
+      id: app.id,
+      theaterName: app.theaterName,
+      ownerEmail: app.ownerEmail,
+      status: app.status
+    })))
+    
+    // Filter approved theaters by owner email
+    const ownerTheaters = theaterApplications.filter(app => {
+      const isApproved = app.status === 'approved'
+      const emailMatch = app.ownerEmail === ownerEmail
+      
+      console.log(`🔍 Theater ${app.theaterName}: approved=${isApproved}, emailMatch=${emailMatch} (${app.ownerEmail} vs ${ownerEmail})`)
+      
+      return isApproved && emailMatch
+    }).map(theater => ({
+      id: theater.id,
+      name: theater.theaterName,
+      screens: theater.screens || 1,
+      totalSeats: theater.totalSeats || 100,
+      location: theater.location || `${theater.city}, ${theater.state}`,
+      ownerEmail: theater.ownerEmail
+    }))
+    
+    console.log(`✅ Found ${ownerTheaters.length} approved theaters for owner ${ownerEmail}`)
+    
+    if (ownerTheaters.length > 0) {
+      res.json({
+        success: true,
+        data: ownerTheaters,
+        total: ownerTheaters.length
+      })
+    } else {
+      // Return empty array instead of test data if no real theaters found
+      console.log('⚠️ No approved theaters found for this owner')
+      res.json({
+        success: true,
+        data: [],
+        total: 0,
+        message: 'No approved theaters found for this owner'
+      })
+    }
+  } catch (error) {
+    console.error('❌ Error getting theaters for owner:', error)
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get theaters for owner',
+      error: error.message
+    })
+  }
+})
+
+// Save seat layout configuration
+router.post('/seat-layouts', async (req, res) => {
+  try {
+    const seatLayoutData = req.body
+    
+    console.log('💾 Saving seat layout for theater:', seatLayoutData.theaterId)
+    
+    // Check if layout already exists
+    const existingIndex = seatLayouts.findIndex(layout => layout.theaterId === seatLayoutData.theaterId)
+    
+    if (existingIndex !== -1) {
+      // Update existing layout
+      seatLayouts[existingIndex] = {
+        ...seatLayoutData,
+        updatedAt: new Date().toISOString()
+      }
+    } else {
+      // Create new layout
+      seatLayouts.push({
+        ...seatLayoutData,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      })
+    }
+    
+    console.log('✅ Seat layout saved successfully')
+    
+    res.json({
+      success: true,
+      message: 'Seat layout saved successfully',
+      data: {
+        theaterId: seatLayoutData.theaterId,
+        ipfsHash: seatLayoutData.ipfsHash,
+        lastUpdated: seatLayoutData.lastUpdated
+      }
+    })
+  } catch (error) {
+    console.error('❌ Error saving seat layout:', error)
+    res.status(500).json({
+      success: false,
+      message: 'Failed to save seat layout'
+    })
+  }
+})
+
+// Get seat layout for a theater
+router.get('/seat-layouts/:theaterId', async (req, res) => {
+  try {
+    const { theaterId } = req.params
+    
+    console.log('📋 Getting seat layout for theater:', theaterId)
+    
+    // Find existing layout
+    const existingLayout = seatLayouts.find(layout => layout.theaterId === theaterId)
+    
+    if (existingLayout) {
+      console.log('✅ Found existing seat layout')
+      res.json({
+        success: true,
+        data: existingLayout
+      })
+    } else {
+      console.log('📝 No existing seat layout found')
+      res.json({
+        success: true,
+        data: null // This will trigger creation of default layout
+      })
+    }
+  } catch (error) {
+    console.error('❌ Error getting seat layout:', error)
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get seat layout'
+    })
+  }
+})
+
 export default router
