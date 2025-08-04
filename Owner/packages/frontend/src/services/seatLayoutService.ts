@@ -1,10 +1,10 @@
 import axios from 'axios'
 import { TheaterSeatLayout } from '../types/seatLayout'
 
-// Use existing Pinata configuration from .env
-const PINATA_API_KEY = import.meta.env.VITE_PINATA_API_KEY
-const PINATA_SECRET_KEY = import.meta.env.VITE_PINATA_SECRET_API_KEY
-const PINATA_JWT = import.meta.env.VITE_PINATA_JWT
+// Use the same working Pinata configuration as the existing IPFS service
+const PINATA_API_KEY = '801420ef88d144bbd41c'
+const PINATA_SECRET_KEY = '17787c717e33c6555e236e8b5a5f2c6f93effb8ed6858f9051a4bf8c22142fe3'
+const PINATA_JWT = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySW5mb3JtYXRpb24iOnsiaWQiOiIzMTAzNGUyNC0yZjdjLTRkNzItYmZmZi0yZTY0MTJmNjhkODMiLCJlbWFpbCI6ImJoYXJhdGhrdW1hcmFjaGFyaXBzQGdtYWlsLmNvbSIsImVtYWlsX3ZlcmlmaWVkIjp0cnVlLCJwaW5fcG9saWN5Ijp7InJlZ2lvbnMiOlt7ImRlc2lyZWRSZXBsaWNhdGlvbkNvdW50IjoxLCJpZCI6IkZSQTEifSx7ImRlc2lyZWRSZXBsaWNhdGlvbkNvdW50IjoxLCJpZCI6Ik5ZQzEifV0sInZlcnNpb24iOjF9LCJtZmFfZW5hYmxlZCI6ZmFsc2UsInN0YXR1cyI6IkFDVElWRSJ9LCJhdXRoZW50aWNhdGlvblR5cGUiOiJzY29wZWRLZXkiLCJzY29wZWRLZXlLZXkiOiI4MDE0MjBlZjg4ZDE0NGJiZDQxYyIsInNjb3BlZEtleVNlY3JldCI6IjE3Nzg3YzcxN2UzM2M2NTU1ZTIzNmU4YjVhNWYyYzZmOTNlZmZiOGVkNjg1OGY5MDUxYTRiZjhjMjIxNDJmZTMiLCJleHAiOjE3ODU1MjE3MTd9.ZM-VPs8f_FxJ7jzlt4tzoB3mduFkIz4EeHXFpkuheso'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api'
 
@@ -28,6 +28,8 @@ export class SeatLayoutService {
   static async uploadSeatLayoutToIPFS(seatLayout: TheaterSeatLayout): Promise<string> {
     try {
       console.log('📤 Uploading seat layout to IPFS:', seatLayout.theaterId)
+      console.log('🔑 Pinata API Key:', PINATA_API_KEY ? 'Present' : 'Missing')
+      console.log('🔑 Pinata JWT:', PINATA_JWT ? 'Present' : 'Missing')
 
       const metadata = {
         name: `Seat Layout - ${seatLayout.theaterName}`,
