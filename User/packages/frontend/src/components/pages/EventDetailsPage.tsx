@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { LocationService, Event, Theater } from '../../services/locationService'
+import { SeatSelection } from '../ui/SeatSelection'
+import { SeatInfo, BookingData } from '../../types/seatLayout'
 
 export function EventDetailsPage() {
   const { eventId } = useParams<{ eventId: string }>()
   const navigate = useNavigate()
-  
+
   const [event, setEvent] = useState<Event | null>(null)
   const [theaters, setTheaters] = useState<Theater[]>([])
   const [selectedTheater, setSelectedTheater] = useState<Theater | null>(null)
@@ -13,6 +15,8 @@ export function EventDetailsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showBookingFlow, setShowBookingFlow] = useState(false)
+  const [showSeatSelection, setShowSeatSelection] = useState(false)
+  const [bookingData, setBookingData] = useState<BookingData | null>(null)
 
   useEffect(() => {
     if (eventId) {
@@ -28,7 +32,7 @@ export function EventDetailsPage() {
       // For now, we'll get the event from the theaters API
       // In a real app, you'd have a dedicated events API
       const allTheaters = await LocationService.searchTheaters('')
-      
+
       let foundEvent: Event | null = null
       let eventTheaters: Theater[] = []
 
@@ -37,7 +41,7 @@ export function EventDetailsPage() {
         try {
           const theaterEvents = await LocationService.getEventsForTheater(theater.id)
           const matchingEvent = theaterEvents.find(e => e.id === eventId)
-          
+
           if (matchingEvent) {
             foundEvent = matchingEvent
             eventTheaters.push(theater)
@@ -76,21 +80,49 @@ export function EventDetailsPage() {
   }
 
   const handleBookTickets = () => {
-    // TODO: Implement ticket booking logic
-    alert(`Booking tickets for ${event?.title} at ${selectedTheater?.name} for ${selectedShowtime}`)
+    if (selectedTheater && selectedShowtime && event) {
+      setShowSeatSelection(true)
+    }
+  }
+
+  const handleSeatSelect = (selectedSeats: SeatInfo[], totalPrice: number) => {
+    if (selectedTheater && selectedShowtime && event) {
+      const booking: BookingData = {
+        eventId: event.id,
+        theaterId: selectedTheater.id,
+        screenId: 'screen-1', // For now, assume screen 1
+        showtime: selectedShowtime,
+        selectedSeats,
+        totalPrice
+      }
+      setBookingData(booking)
+
+      // For now, just show an alert with booking details
+      alert(`Booking confirmed!\n\nMovie: ${event.title}\nTheater: ${selectedTheater.name}\nShowtime: ${selectedShowtime}\nSeats: ${selectedSeats.map(s => s.row + s.number).join(', ')}\nTotal: ₹${totalPrice}`)
+
+      // Reset the flow
+      setShowSeatSelection(false)
+      setShowBookingFlow(false)
+      setSelectedTheater(null)
+      setSelectedShowtime(null)
+    }
+  }
+
+  const handleBackFromSeatSelection = () => {
+    setShowSeatSelection(false)
   }
 
   const getYouTubeEmbedUrl = (url: string) => {
     if (!url) return ''
-    
+
     // Extract video ID from various YouTube URL formats
     const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/
     const match = url.match(regExp)
-    
+
     if (match && match[2].length === 11) {
       return `https://www.youtube.com/embed/${match[2]}`
     }
-    
+
     return url
   }
 
@@ -129,6 +161,19 @@ export function EventDetailsPage() {
           </div>
         </div>
       </div>
+    )
+  }
+
+  // Show seat selection if user has selected theater and showtime
+  if (showSeatSelection && selectedTheater && selectedShowtime && event) {
+    return (
+      <SeatSelection
+        theater={selectedTheater}
+        event={event}
+        showtime={selectedShowtime}
+        onSeatSelect={handleSeatSelect}
+        onBack={handleBackFromSeatSelection}
+      />
     )
   }
 
@@ -187,8 +232,8 @@ export function EventDetailsPage() {
                 <div className="mb-8">
                   <h3 className="text-xl font-semibold text-white mb-4">Movie Poster</h3>
                   <div className="relative rounded-xl overflow-hidden">
-                    <img 
-                      src={event.imageUrl} 
+                    <img
+                      src={event.imageUrl}
                       alt={event.title}
                       className="w-full h-64 object-cover"
                     />
@@ -236,11 +281,10 @@ export function EventDetailsPage() {
                       <div
                         key={theater.id}
                         onClick={() => handleTheaterSelect(theater)}
-                        className={`p-4 rounded-xl border cursor-pointer transition-all duration-200 ${
-                          selectedTheater?.id === theater.id
-                            ? 'border-violet-500 bg-violet-500/10'
-                            : 'border-slate-600 bg-slate-700/30 hover:border-slate-500'
-                        }`}
+                        className={`p-4 rounded-xl border cursor-pointer transition-all duration-200 ${selectedTheater?.id === theater.id
+                          ? 'border-violet-500 bg-violet-500/10'
+                          : 'border-slate-600 bg-slate-700/30 hover:border-slate-500'
+                          }`}
                       >
                         <div className="flex items-center justify-between">
                           <div>
@@ -251,11 +295,10 @@ export function EventDetailsPage() {
                               <span>{theater.totalSeats} total seats</span>
                             </div>
                           </div>
-                          <div className={`w-5 h-5 rounded-full border-2 ${
-                            selectedTheater?.id === theater.id
-                              ? 'border-violet-500 bg-violet-500'
-                              : 'border-slate-500'
-                          }`}>
+                          <div className={`w-5 h-5 rounded-full border-2 ${selectedTheater?.id === theater.id
+                            ? 'border-violet-500 bg-violet-500'
+                            : 'border-slate-500'
+                            }`}>
                             {selectedTheater?.id === theater.id && (
                               <svg className="w-3 h-3 text-white m-0.5" fill="currentColor" viewBox="0 0 20 20">
                                 <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
@@ -278,11 +321,10 @@ export function EventDetailsPage() {
                         <button
                           key={time}
                           onClick={() => handleShowtimeSelect(time)}
-                          className={`p-3 rounded-lg border text-center transition-all duration-200 ${
-                            selectedShowtime === time
-                              ? 'border-violet-500 bg-violet-500/20 text-violet-300'
-                              : 'border-slate-600 bg-slate-700/30 text-slate-300 hover:border-slate-500'
-                          }`}
+                          className={`p-3 rounded-lg border text-center transition-all duration-200 ${selectedShowtime === time
+                            ? 'border-violet-500 bg-violet-500/20 text-violet-300'
+                            : 'border-slate-600 bg-slate-700/30 text-slate-300 hover:border-slate-500'
+                            }`}
                         >
                           <div className="font-semibold">{time}</div>
                           <div className="text-xs text-slate-400 mt-1">
@@ -311,7 +353,7 @@ export function EventDetailsPage() {
           <div className="lg:col-span-1">
             <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-2xl p-6 sticky top-24">
               <h3 className="text-xl font-semibold text-white mb-4">Watch Trailer</h3>
-              
+
               {/* Trailer Embed */}
               <div className="relative rounded-xl overflow-hidden mb-6">
                 <div className="aspect-video">
@@ -326,15 +368,15 @@ export function EventDetailsPage() {
                     />
                   ) : event.imageUrl ? (
                     <div className="w-full h-full bg-slate-700 flex items-center justify-center relative">
-                      <img 
-                        src={event.imageUrl} 
+                      <img
+                        src={event.imageUrl}
                         alt={event.title}
                         className="w-full h-full object-cover"
                       />
                       <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
                         <div className="text-center">
                           <svg className="w-16 h-16 text-white mx-auto mb-2" fill="currentColor" viewBox="0 0 24 24">
-                            <path d="M8 5v14l11-7z"/>
+                            <path d="M8 5v14l11-7z" />
                           </svg>
                           <p className="text-white">Trailer not available</p>
                         </div>
