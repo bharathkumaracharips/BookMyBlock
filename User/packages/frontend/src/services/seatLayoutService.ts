@@ -39,32 +39,44 @@ export class UserSeatLayoutService {
   static async getTheaterSeatLayout(theaterId: string): Promise<TheaterSeatLayout | null> {
     try {
       console.log('📋 Getting seat layout for theater:', theaterId)
+      console.log('🔗 API URL:', `${API_BASE_URL}/admin/seat-layouts/${theaterId}`)
 
       // First try to get from backend
       const response = await this.backendApi.get(`/seat-layouts/${theaterId}`)
+      
+      console.log('📋 Backend response status:', response.status)
+      console.log('📋 Backend response data:', response.data)
 
       if (response.data.success && response.data.data) {
         const layoutData = response.data.data
+        console.log('✅ Found seat layout data in backend:', layoutData)
 
         // If there's an IPFS hash, get the latest data from IPFS
         if (layoutData.ipfsHash) {
+          console.log('🔗 Found IPFS hash:', layoutData.ipfsHash)
           try {
             const ipfsData = await this.getSeatLayoutFromIPFS(layoutData.ipfsHash)
-            console.log('✅ Seat layout retrieved from IPFS')
+            console.log('✅ Seat layout retrieved from IPFS:', ipfsData)
+            console.log('📊 IPFS layout total seats:', ipfsData.screens[0]?.totalSeats)
             return ipfsData
           } catch (ipfsError) {
-            console.warn('⚠️ Failed to retrieve from IPFS, using backend data')
+            console.warn('⚠️ Failed to retrieve from IPFS, using backend data:', ipfsError)
             return layoutData
           }
         }
 
+        console.log('📋 Using backend data (no IPFS hash)')
         return layoutData
       }
 
-      // If no layout found, return null (will generate default)
+      console.log('❌ No seat layout data found in backend response')
       return null
     } catch (error) {
       console.error('❌ Error getting theater seat layout:', error)
+      if (error.response) {
+        console.error('❌ Response status:', error.response.status)
+        console.error('❌ Response data:', error.response.data)
+      }
       return null
     }
   }

@@ -209,13 +209,25 @@ export class TheaterService {
       console.log(`🎯 Finding theaters near pincode: ${userPincode}`)
       
       const allTheaters = await this.getAllApprovedTheaters()
+      console.log(`🏛️ Total approved theaters: ${allTheaters.length}`)
+      console.log(`🏛️ Theater details:`, allTheaters.map(t => ({ 
+        id: t.id, 
+        name: t.name, 
+        pincode: t.pincode,
+        city: t.city,
+        location: t.location 
+      })))
       
       const nearbyTheaters = allTheaters.filter(theater => {
+        console.log(`🔍 Checking theater: ${theater.name} (pincode: ${theater.pincode}) against user pincode: ${userPincode}`)
         const isNearby = PDFParsingService.isPincodeNearby(userPincode, theater.pincode, maxDistance)
+        console.log(`📏 Is ${theater.name} nearby? ${isNearby}`)
+        
         if (isNearby) {
           // Calculate approximate distance (simplified)
           const distance = this.calculateApproximateDistance(userPincode, theater.pincode)
           theater.distance = distance
+          console.log(`📍 Distance to ${theater.name}: ${distance}km`)
         }
         return isNearby
       })
@@ -224,6 +236,7 @@ export class TheaterService {
       nearbyTheaters.sort((a, b) => (a.distance || 0) - (b.distance || 0))
 
       console.log(`✅ Found ${nearbyTheaters.length} theaters near ${userPincode}`)
+      console.log(`🎭 Nearby theaters:`, nearbyTheaters.map(t => ({ id: t.id, name: t.name, distance: t.distance })))
       return nearbyTheaters
 
     } catch (error) {

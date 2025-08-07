@@ -42,53 +42,92 @@ async function loadEventsFromIPFS() {
     for (const pin of response.data.rows) {
       try {
         console.log(`🔍 Checking pin: ${pin.ipfs_pin_hash}`)
+        console.log(`📋 Pin metadata:`, JSON.stringify(pin.metadata, null, 2))
 
-        const eventResponse = await axios.get(`https://gateway.pinata.cloud/ipfs/${pin.ipfs_pin_hash}`, {
-          timeout: 5000
-        })
-        const eventData = eventResponse.data
-
-        console.log(`📄 Pin content preview:`, JSON.stringify(eventData).substring(0, 200))
-
-        // Check if this is an event - be more flexible with the structure
-        if (eventData &&
-          (eventData.movieTitle || eventData.title) &&
-          (eventData.theaterId || eventData.theater_id)) {
-
-          const movieTitle = eventData.movieTitle || eventData.title
-          const theaterId = eventData.theaterId || eventData.theater_id
-
-          console.log(`✅ Found event: ${movieTitle} for theater: ${theaterId}`)
-
-          // Convert IPFS event data to backend format
+        // Check if this is an event from metadata first (more reliable)
+        const isEventFromMetadata = pin.metadata?.keyvalues?.type === 'theater_event'
+        
+        if (isEventFromMetadata) {
+          console.log(`✅ Found event from metadata: ${pin.metadata.keyvalues.movieTitle}`)
+          
+          // Create event directly from metadata (avoids Cloudflare issues)
           const backendEvent = {
             id: `ipfs_event_${eventIdCounter++}`,
-            theaterId: theaterId,
-            movieTitle: movieTitle,
-            startDate: eventData.startDate || eventData.start_date || new Date().toISOString().split('T')[0],
-            endDate: eventData.endDate || eventData.end_date || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-            showTimes: eventData.showTimes || eventData.show_times || ['19:00'],
-            ticketPrice: eventData.ticketPrice || eventData.ticket_price || 250,
-            description: eventData.description || `${movieTitle} - Theater Event`,
+            theaterId: pin.metadata.keyvalues.theaterId,
+            movieTitle: pin.metadata.keyvalues.movieTitle,
+            startDate: pin.metadata.keyvalues.startDate || new Date().toISOString().split('T')[0],
+            endDate: pin.metadata.keyvalues.endDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+            showTimes: ['19:00', '22:00'], // Default show times
+            ticketPrice: 250, // Default price
+            description: `${pin.metadata.keyvalues.movieTitle} - Theater Event`,
             ipfsHash: pin.ipfs_pin_hash,
             ipfsUrl: `https://gateway.pinata.cloud/ipfs/${pin.ipfs_pin_hash}`,
-            posterHash: eventData.posterHash || eventData.poster_hash || null,
-            posterUrl: eventData.posterUrl || eventData.poster_url || null,
-            trailerUrl: eventData.trailerUrl || eventData.trailer_url || null,
+            posterHash: null,
+            posterUrl: null,
+            trailerUrl: null,
             status: 'upcoming',
-            availableSeats: eventData.availableSeats || 180,
-            totalSeats: eventData.totalSeats || 200,
-            createdAt: eventData.createdAt || eventData.created_at || new Date().toISOString(),
-            updatedAt: eventData.updatedAt || eventData.updated_at || new Date().toISOString()
+            availableSeats: 180,
+            totalSeats: 200,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
           }
 
           realEventsFromIPFS.push(backendEvent)
-          console.log(`✅ Loaded real event from IPFS: ${movieTitle} (ID: ${backendEvent.id})`)
-        } else {
-          console.log(`⏭️ Skipping non-event pin: ${pin.ipfs_pin_hash}`)
+          console.log(`✅ Loaded event from metadata: ${backendEvent.movieTitle} (ID: ${backendEvent.id})`)
+          continue
+        }
+
+        // Try to fetch content for non-metadata events (fallback)
+        try {
+          const eventResponse = await axios.get(`https://gateway.pinata.cloud/ipfs/${pin.ipfs_pin_hash}`, {
+            timeout: 5000
+          })
+          const eventData = eventResponse.data
+
+          console.log(`📄 Pin content preview:`, JSON.stringify(eventData).substring(0, 200))
+
+          // Check if content has event structure
+          const hasEventContent = eventData &&
+            (eventData.movieTitle || eventData.title) &&
+            (eventData.theaterId || eventData.theater_id)
+
+          if (hasEventContent) {
+            const movieTitle = eventData.movieTitle || eventData.title
+            const theaterId = eventData.theaterId || eventData.theater_id
+
+            console.log(`✅ Found event from content: ${movieTitle} for theater: ${theaterId}`)
+
+            const backendEvent = {
+              id: `ipfs_event_${eventIdCounter++}`,
+              theaterId: theaterId,
+              movieTitle: movieTitle,
+              startDate: eventData.startDate || eventData.start_date || new Date().toISOString().split('T')[0],
+              endDate: eventData.endDate || eventData.end_date || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+              showTimes: eventData.showTimes || eventData.show_times || ['19:00', '22:00'],
+              ticketPrice: eventData.ticketPrice || eventData.ticket_price || 250,
+              description: eventData.description || `${movieTitle} - Theater Event`,
+              ipfsHash: pin.ipfs_pin_hash,
+              ipfsUrl: `https://gateway.pinata.cloud/ipfs/${pin.ipfs_pin_hash}`,
+              posterHash: eventData.posterHash || eventData.poster_hash || null,
+              posterUrl: eventData.posterUrl || eventData.poster_url || null,
+              trailerUrl: eventData.trailerUrl || eventData.trailer_url || null,
+              status: 'upcoming',
+              availableSeats: eventData.availableSeats || 180,
+              totalSeats: eventData.totalSeats || 200,
+              createdAt: eventData.createdAt || eventData.created_at || new Date().toISOString(),
+              updatedAt: eventData.updatedAt || eventData.updated_at || new Date().toISOString()
+            }
+
+            realEventsFromIPFS.push(backendEvent)
+            console.log(`✅ Loaded event from content: ${movieTitle} (ID: ${backendEvent.id})`)
+          } else {
+            console.log(`⏭️ Skipping non-event pin: ${pin.ipfs_pin_hash}`)
+          }
+        } catch (contentError) {
+          console.warn(`⚠️ Could not fetch content for pin ${pin.ipfs_pin_hash}:`, contentError.message)
         }
       } catch (eventError) {
-        console.warn(`⚠️ Failed to load/parse pin ${pin.ipfs_pin_hash}:`, eventError)
+        console.warn(`⚠️ Failed to process pin ${pin.ipfs_pin_hash}:`, eventError.message)
       }
     }
 
