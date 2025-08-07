@@ -408,11 +408,28 @@ router.get('/seat-layouts/:theaterId', async (req, res) => {
         }
       })
 
+      console.log(`🔍 Found ${response.data.rows.length} pins in Pinata`)
+      console.log('🔍 Looking for theaterId:', theaterId)
+      
+      // Debug: Log metadata of all pins
+      response.data.rows.forEach((pin: any, index: number) => {
+        console.log(`📌 Pin ${index + 1}:`, {
+          hash: pin.ipfs_pin_hash,
+          metadata: pin.metadata
+        })
+      })
+
       // Find seat layout for this theater
-      const seatLayoutPin = response.data.rows.find((pin: any) => 
-        pin.metadata?.keyvalues?.type === 'seat-layout' &&
-        pin.metadata?.keyvalues?.theaterId === theaterId
-      )
+      const seatLayoutPin = response.data.rows.find((pin: any) => {
+        // Check both keyvalues format and direct metadata format
+        const hasKeyvalues = pin.metadata?.keyvalues?.type === 'seat-layout' &&
+                           pin.metadata?.keyvalues?.theaterId === theaterId
+        
+        const hasDirectMetadata = pin.metadata?.name?.includes('Seat Layout') &&
+                                pin.metadata?.theaterId === theaterId
+        
+        return hasKeyvalues || hasDirectMetadata
+      })
 
       if (seatLayoutPin) {
         console.log(`📍 Found seat layout pin on IPFS: ${seatLayoutPin.ipfs_pin_hash}`)

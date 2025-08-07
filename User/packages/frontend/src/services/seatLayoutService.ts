@@ -4,11 +4,11 @@ import { TheaterSeatLayout } from '../types/seatLayout'
 // Use the same working Pinata configuration as the Owner app
 const PINATA_JWT = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySW5mb3JtYXRpb24iOnsiaWQiOiIzMTAzNGUyNC0yZjdjLTRkNzItYmZmZi0yZTY0MTJmNjhkODMiLCJlbWFpbCI6ImJoYXJhdGhrdW1hcmFjaGFyaXBzQGdtYWlsLmNvbSIsImVtYWlsX3ZlcmlmaWVkIjp0cnVlLCJwaW5fcG9saWN5Ijp7InJlZ2lvbnMiOlt7ImRlc2lyZWRSZXBsaWNhdGlvbkNvdW50IjoxLCJpZCI6IkZSQTEifSx7ImRlc2lyZWRSZXBsaWNhdGlvbkNvdW50IjoxLCJpZCI6Ik5ZQzEifV0sInZlcnNpb24iOjF9LCJtZmFfZW5hYmxlZCI6ZmFsc2UsInN0YXR1cyI6IkFDVElWRSJ9LCJhdXRoZW50aWNhdGlvblR5cGUiOiJzY29wZWRLZXkiLCJzY29wZWRLZXlLZXkiOiI4MDE0MjBlZjg4ZDE0NGJiZDQxYyIsInNjb3BlZEtleVNlY3JldCI6IjE3Nzg3YzcxN2UzM2M2NTU1ZTIzNmU4YjVhNWYyYzZmOTNlZmZiOGVkNjg1OGY5MDUxYTRiZjhjMjIxNDJmZTMiLCJleHAiOjE3ODU1MjE3MTd9.ZM-VPs8f_FxJ7jzlt4tzoB3mduFkIz4EeHXFpkuheso'
 
-const API_BASE_URL = 'http://localhost:8002/api' // Owner backend where seat layouts are stored
+const API_BASE_URL = 'http://localhost:8001/api' // User backend with seat layout endpoint
 
 export class UserSeatLayoutService {
   private static backendApi = axios.create({
-    baseURL: `${API_BASE_URL}/admin`,
+    baseURL: `${API_BASE_URL}/theaters`,
     timeout: 10000
   })
 
@@ -39,10 +39,10 @@ export class UserSeatLayoutService {
   static async getTheaterSeatLayout(theaterId: string): Promise<TheaterSeatLayout | null> {
     try {
       console.log('📋 Getting seat layout for theater:', theaterId)
-      console.log('🔗 API URL:', `${API_BASE_URL}/admin/seat-layouts/${theaterId}`)
+      console.log('🔗 API URL:', `${API_BASE_URL}/theaters/${theaterId}/seat-layout`)
 
       // First try to get from backend
-      const response = await this.backendApi.get(`/seat-layouts/${theaterId}`)
+      const response = await this.backendApi.get(`/${theaterId}/seat-layout`)
       
       console.log('📋 Backend response status:', response.status)
       console.log('📋 Backend response data:', response.data)
