@@ -78,7 +78,7 @@ export class TheaterService {
             allEvents
               .filter((event: any) => event.theaterId.startsWith('blockchain_'))
               .map((event: any) => event.theaterId)
-          )]
+          )] as string[]
           
           console.log(`🔗 Found ${blockchainTheaterIds.length} blockchain theaters with events:`, blockchainTheaterIds)
           
@@ -97,6 +97,13 @@ export class TheaterService {
               state = 'Telangana'
               console.log(`🏙️ Detected Hyderabad theater: ${blockchainId}`)
             }
+
+            // TODO: Get real seat layout data from IPFS (temporarily disabled for debugging)
+            // const seatLayoutData = await this.getSeatLayoutFromIPFS(blockchainId)
+            const totalSeats = 200 // Temporary fallback
+            const screens = 1 // Temporary fallback
+            
+            console.log(`🪑 Theater ${blockchainId} seat info: ${totalSeats} seats, ${screens} screens (using fallback)`)
             
             const mappedTheater: Theater = {
               id: blockchainId,
@@ -108,8 +115,8 @@ export class TheaterService {
               address: theaterLocation === 'Hyderabad' 
                 ? 'Banjara Hills, Hyderabad' 
                 : 'Kummarimitta Street, Tirupati',
-              screens: 1,
-              totalSeats: 200,
+              screens: screens,
+              totalSeats: totalSeats,
               status: 'active',
               ownerName: 'Theater Owner',
               ownerEmail: 'owner@pvr.com',
@@ -348,11 +355,10 @@ export class TheaterService {
               time: showTime,
               duration: 120, // Default duration
               ticketPrice: ownerEvent.ticketPrice,
-              availableSeats: ownerEvent.availableSeats || 100,
-              totalSeats: ownerEvent.totalSeats || 100,
+              availableSeats: ownerEvent.availableSeats || 180,
+              totalSeats: ownerEvent.totalSeats || 200,
               category: 'Movie', // Default category
               imageUrl: ownerEvent.posterUrl || undefined,
-              trailerUrl: ownerEvent.trailerUrl || undefined,
               status: ownerEvent.status === 'upcoming' ? 'active' : 
                      ownerEvent.status === 'cancelled' ? 'cancelled' : 'active'
             }
@@ -373,11 +379,10 @@ export class TheaterService {
               time: '19:00', // Default time
               duration: 120,
               ticketPrice: ownerEvent.ticketPrice,
-              availableSeats: ownerEvent.availableSeats || 100,
-              totalSeats: ownerEvent.totalSeats || 100,
+              availableSeats: ownerEvent.availableSeats || 180,
+              totalSeats: ownerEvent.totalSeats || 200,
               category: 'Movie',
               imageUrl: ownerEvent.posterUrl || undefined,
-              trailerUrl: ownerEvent.trailerUrl || undefined,
               status: ownerEvent.status === 'upcoming' ? 'active' : 
                      ownerEvent.status === 'cancelled' ? 'cancelled' : 'active'
             }

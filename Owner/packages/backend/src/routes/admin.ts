@@ -1,4 +1,5 @@
 import express from 'express'
+import axios from 'axios'
 // import { PinataService } from '../services/pinataService'
 
 const router = express.Router()
@@ -378,22 +379,81 @@ router.get('/seat-layouts/:theaterId', async (req, res) => {
     
     console.log('📋 Getting seat layout for theater:', theaterId)
     
-    // Find existing layout
+    // First check in-memory storage
     const existingLayout = seatLayouts.find(layout => layout.theaterId === theaterId)
     
     if (existingLayout) {
-      console.log('✅ Found existing seat layout')
+      console.log('✅ Found existing seat layout in memory')
       res.json({
         success: true,
         data: existingLayout
       })
-    } else {
-      console.log('📝 No existing seat layout found')
-      res.json({
-        success: true,
-        data: null // This will trigger creation of default layout
-      })
+      return
     }
+    
+    // If not in memory, try to fetch from IPFS
+    console.log('🔍 No layout in memory, checking IPFS for theater:', theaterId)
+    
+    try {
+      const PINATA_JWT = process.env.PINATA_JWT || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySW5mb3JtYXRpb24iOnsiaWQiOiIzMTAzNGUyNC0yZjdjLTRkNzItYmZmZi0yZTY0MTJmNjhkODMiLCJlbWFpbCI6ImJoYXJhdGhrdW1hcmFjaGFyaXBzQGdtYWlsLmNvbSIsImVtYWlsX3ZlcmlmaWVkIjp0cnVlLCJwaW5fcG9saWN5Ijp7InJlZ2lvbnMiOlt7ImRlc2lyZWRSZXBsaWNhdGlvbkNvdW50IjoxLCJpZCI6IkZSQTEifSx7ImRlc2lyZWRSZXBsaWNhdGlvbkNvdW50IjoxLCJpZCI6Ik5ZQzEifV0sInZlcnNpb24iOjF9LCJtZmFfZW5hYmxlZCI6ZmFsc2UsInN0YXR1cyI6IkFDVElWRSJ9LCJhdXRoZW50aWNhdGlvblR5cGUiOiJzY29wZWRLZXkiLCJzY29wZWRLZXlLZXkiOiI4MDE0MjBlZjg4ZDE0NGJiZDQxYyIsInNjb3BlZEtleVNlY3JldCI6IjE3Nzg3YzcxN2UzM2M2NTU1ZTIzNmU4YjVhNWYyYzZmOTNlZmZiOGVkNjg1OGY5MDUxYTRiZjhjMjIxNDJmZTMiLCJleHAiOjE3ODU1MjE3MTd9.ZM-VPs8f_FxJ7jzlt4tzoB3mduFkIz4EeHXFpkuheso'
+      
+      // Get all pins from Pinata
+      const response = await axios.get('https://api.pinata.cloud/data/pinList', {
+        headers: {
+          'Authorization': `Bearer ${PINATA_JWT}`
+        },
+        params: {
+          status: 'pinned',
+          pageLimit: 100
+        }
+      })
+
+      // Find seat layout for this theater
+      const seatLayoutPin = response.data.rows.find((pin: any) => 
+        pin.metadata?.keyvalues?.type === 'seat-layout' &&
+        pin.metadata?.keyvalues?.theaterId === theaterId
+      )
+
+      if (seatLayoutPin) {
+        console.log(`📍 Found seat layout pin on IPFS: ${seatLayoutPin.ipfs_pin_hash}`)
+        
+        // Fetch the actual seat layout data
+        const layoutResponse = await axios.get(`https://gateway.pinata.cloud/ipfs/${seatLayoutPin.ipfs_pin_hash}`, {
+          timeout: 10000
+        })
+
+        const layoutData = layoutResponse.data
+        if (layoutData) {
+          console.log('✅ Successfully fetched seat layout from IPFS')
+          console.log(`📊 Layout has ${layoutData.screens?.length || 0} screens with ${layoutData.screens?.[0]?.totalSeats || 0} seats`)
+          
+          // Cache it in memory for future requests
+          seatLayouts.push({
+            ...layoutData,
+            ipfsHash: seatLayoutPin.ipfs_pin_hash,
+            fetchedFromIPFS: true,
+            cachedAt: new Date().toISOString()
+          })
+          
+          res.json({
+            success: true,
+            data: layoutData
+          })
+          return
+        }
+      }
+      
+      console.log('⚠️ No seat layout found on IPFS for theater:', theaterId)
+    } catch (ipfsError) {
+      console.warn('⚠️ Failed to fetch from IPFS:', ipfsError.message)
+    }
+    
+    // If not found anywhere, return null
+    console.log('📝 No seat layout found anywhere, returning null')
+    res.json({
+      success: true,
+      data: null // This will trigger creation of default layout
+    })
   } catch (error) {
     console.error('❌ Error getting seat layout:', error)
     res.status(500).json({
